@@ -15,6 +15,12 @@ namespace ContextMenuManager
 
         public static string GetRegistryPath(string targetType)
         {
+            if (targetType.StartsWith("FileExtension:"))
+            {
+                string ext = targetType.Substring("FileExtension:".Length);
+                return $@"Software\Classes\SystemFileAssociations\{ext}\shell";
+            }
+
             return targetType switch
             {
                 "Background" => REG_PATH_BG,
@@ -32,6 +38,26 @@ namespace ContextMenuManager
             shortcuts.AddRange(LoadShortcutsFromKey(REG_PATH_BG, "Background", "Boş Alan"));
             shortcuts.AddRange(LoadShortcutsFromKey(REG_PATH_DIR, "Directory", "Klasör"));
             shortcuts.AddRange(LoadShortcutsFromKey(REG_PATH_FILE, "AllFiles", "Tüm Dosyalar"));
+
+            // Load from file extension associations
+            try
+            {
+                using (var baseKey = Registry.CurrentUser.OpenSubKey(@"Software\Classes\SystemFileAssociations"))
+                {
+                    if (baseKey != null)
+                    {
+                        foreach (var ext in baseKey.GetSubKeyNames())
+                        {
+                            string shellPath = $@"Software\Classes\SystemFileAssociations\{ext}\shell";
+                            shortcuts.AddRange(LoadShortcutsFromKey(shellPath, $"FileExtension:{ext}", $"Uzantı ({ext})"));
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Uzantı kısayolları yüklenirken hata: {ex.Message}");
+            }
 
             return shortcuts;
         }
@@ -477,6 +503,155 @@ namespace ContextMenuManager
             catch
             {
                 return false;
+            }
+        }
+
+        public static List<ShellExtensionItem> LoadShellExtensions()
+        {
+            var list = new List<ShellExtensionItem>();
+            var uniqueClsids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            // Read blocked extensions list
+            var blockedClsids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                using (var blockedKey = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Shell Extensions\Blocked"))
+                {
+                    if (blockedKey != null)
+                    {
+                        foreach (var name in blockedKey.GetValueNames())
+                        {
+                            blockedClsids.Add(name);
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            string[] paths = {
+                @"*\shellex\ContextMenuHandlers",
+                @"Directory\shellex\ContextMenuHandlers",
+                @"Folder\shellex\ContextMenuHandlers",
+                @"Directory\Background\shellex\ContextMenuHandlers"
+            };
+
+            foreach (var path in paths)
+            {
+                string targetDisplay = path switch
+                {
+                    @"*\shellex\ContextMenuHandlers" => "Tüm Dosyalar",
+                    @"Directory\shellex\ContextMenuHandlers" => "Klasör",
+                    @"Folder\shellex\ContextMenuHandlers" => "Klasörler (Folder)",
+                    @"Directory\Background\shellex\ContextMenuHandlers" => "Boş Alan",
+                    _ => "Diğer"
+                };
+
+                try
+                {
+                    using (var key = Registry.ClassesRoot.OpenSubKey(path))
+                    {
+                        if (key != null)
+                        {
+                            foreach (var subkeyName in key.GetSubKeyNames())
+                            {
+                                string clsid = string.Empty;
+                                using (var subkey = key.OpenSubKey(subkeyName))
+                                {
+                                    if (subkey != null)
+                                    {
+                                        clsid = subkey.GetValue("")?.ToString() ?? string.Empty;
+                                    }
+                                }
+
+                                // If the value itself is empty/not a guid, check if the key name itself is a guid
+                                if (string.IsNullOrEmpty(clsid) || !clsid.StartsWith("{") || !clsid.EndsWith("}"))
+                                {
+                                    if (subkeyName.StartsWith("{") && subkeyName.EndsWith("}"))
+                                    {
+                                        clsid = subkeyName;
+                                    }
+                                }
+
+                                if (!string.IsNullOrEmpty(clsid) && clsid.StartsWith("{") && clsid.EndsWith("}"))
+                                {
+                                    // Skip system/essential Windows handlers to prevent users from breaking basic OS features
+                                    if (IsSystemClsid(clsid) || IsSystemKeyName(subkeyName))
+                                    {
+                                        continue;
+                                    }
+
+                                    string uniqueKey = $"{clsid}|{path}";
+                                    if (!uniqueClsids.Contains(uniqueKey))
+                                    {
+                                        uniqueClsids.Add(uniqueKey);
+                                        list.Add(new ShellExtensionItem
+                                        {
+                                            KeyName = subkeyName,
+                                            Clsid = clsid,
+                                            RegistryPath = $@"HKCR\{path}\{subkeyName}",
+                                            TargetDisplay = targetDisplay,
+                                            IsBlocked = blockedClsids.Contains(clsid)
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            return list;
+        }
+
+        private static bool IsSystemClsid(string clsid)
+        {
+            string[] systemClsids = {
+                "{09799AFB-AD67-11d1-ABCD-00C04FC30936}", // Open With
+                "{f81e9010-6ea4-11ce-a7ff-00aa003ca9f6}", // Sharing
+                "{E61BF828-5E63-4287-BEF1-60B1A4FDE0E3}", // WorkFolders
+                "{90AA3A4E-1CBA-4233-B8BB-535773D48449}", // Taskband Pin
+                "{a2a9545d-a0c2-42b4-9708-a0b2badd77c8}", // Start Menu Pin
+                "{851A0071-23C4-42b9-9908-5682957D0850}", // Windows Defender
+                "{09A47860-11B0-4DA5-AFA5-26D86198A780}"  // Windows Defender (EPP)
+            };
+
+            foreach (var sys in systemClsids)
+            {
+                if (sys.Equals(clsid, StringComparison.OrdinalIgnoreCase)) return true;
+            }
+            return false;
+        }
+
+        private static bool IsSystemKeyName(string name)
+        {
+            string[] systemNames = { "Open With", "Sharing", "WorkFolders", "EPP" };
+            foreach (var sys in systemNames)
+            {
+                if (sys.Equals(name, StringComparison.OrdinalIgnoreCase)) return true;
+            }
+            return false;
+        }
+
+        public static void ToggleShellExtension(string clsid, bool block)
+        {
+            string blockedKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Shell Extensions\Blocked";
+            if (block)
+            {
+                using (var key = Registry.CurrentUser.CreateSubKey(blockedKeyPath))
+                {
+                    key.SetValue(clsid, "");
+                }
+            }
+            else
+            {
+                using (var key = Registry.CurrentUser.OpenSubKey(blockedKeyPath, true))
+                {
+                    if (key != null)
+                    {
+                        try { key.DeleteValue(clsid); } catch { }
+                    }
+                }
             }
         }
     }

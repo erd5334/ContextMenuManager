@@ -33,6 +33,10 @@ namespace ContextMenuManager
                 GroupCombo.ItemsSource = groups;
                 GroupCombo.Text = "Ana Menü";
 
+                // Load shell extensions and bind to Grid
+                var shellExtensions = RegistryService.LoadShellExtensions();
+                ShellExtensionsGrid.ItemsSource = shellExtensions;
+
                 // Set initial status of checkboxes
                 ClassicMenuChk.IsChecked = RegistryService.CheckClassicMenuStatus();
                 PowerShellChk.IsChecked = RegistryService.CheckPowerShellStatus();
@@ -99,14 +103,13 @@ namespace ContextMenuManager
         {
             try
             {
-                var dialog = new Microsoft.Win32.OpenFileDialog
+                var dialog = new IconPickerDialog
                 {
-                    Title = "İkon Görseli veya Kaynağı Seçin",
-                    Filter = "İkon Kaynakları (*.ico;*.exe;*.dll;*.png)|*.ico;*.exe;*.dll;*.png|Tüm Dosyalar (*.*)|*.*"
+                    Owner = this
                 };
                 if (dialog.ShowDialog() == true)
                 {
-                    IconTxt.Text = dialog.FileName;
+                    IconTxt.Text = dialog.SelectedIconResult;
                 }
             }
             catch (Exception ex)
@@ -128,6 +131,7 @@ namespace ContextMenuManager
                 0 => "Background",
                 1 => "Directory",
                 2 => "AllFiles",
+                3 => $"FileExtension:{NormalizeExtension(ExtensionTxt.Text.Trim())}",
                 _ => "Background"
             };
 
@@ -219,13 +223,24 @@ namespace ContextMenuManager
             TypeCombo.SelectedIndex = selectedItem.IsFolder ? 0 : 1;
 
             // Target type selection
-            TargetCombo.SelectedIndex = selectedItem.TargetType switch
+            if (selectedItem.TargetType.StartsWith("FileExtension:"))
             {
-                "Background" => 0,
-                "Directory" => 1,
-                "AllFiles" => 2,
-                _ => 0
-            };
+                TargetCombo.SelectedIndex = 3;
+                string ext = selectedItem.TargetType.Substring("FileExtension:".Length);
+                ExtensionTxt.Text = ext;
+                if (ExtensionPanel != null) ExtensionPanel.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                TargetCombo.SelectedIndex = selectedItem.TargetType switch
+                {
+                    "Background" => 0,
+                    "Directory" => 1,
+                    "AllFiles" => 2,
+                    _ => 0
+                };
+                if (ExtensionPanel != null) ExtensionPanel.Visibility = Visibility.Collapsed;
+            }
 
             // Position selection
             PositionCombo.SelectedIndex = selectedItem.Position switch
@@ -252,6 +267,8 @@ namespace ContextMenuManager
             TypeCombo.SelectedIndex = 0;
             TargetCombo.SelectedIndex = 0;
             PositionCombo.SelectedIndex = 0;
+            ExtensionTxt.Text = ".txt";
+            if (ExtensionPanel != null) ExtensionPanel.Visibility = Visibility.Collapsed;
 
             FormTitleLabel.Text = "Yeni Kısayol Ekle";
             AddBtn.Visibility = Visibility.Visible;
@@ -294,6 +311,7 @@ namespace ContextMenuManager
                 0 => "Background",
                 1 => "Directory",
                 2 => "AllFiles",
+                3 => $"FileExtension:{NormalizeExtension(ExtensionTxt.Text.Trim())}",
                 _ => "Background"
             };
 
@@ -534,6 +552,69 @@ namespace ContextMenuManager
             {
                 MessageBox.Show($"Windows Gezgini yeniden başlatılamadı, lütfen bilgisayarınızı yeniden başlatın veya oturumu kapatıp açın.\nDetay: {ex.Message}", "Bilgilendirme", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
+        }
+
+        private void TargetCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isInitializing || ExtensionPanel == null) return;
+
+            if (TargetCombo.SelectedIndex == 3) // Belirli Dosya Uzantısı
+            {
+                ExtensionPanel.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                ExtensionPanel.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        private void ToggleBlockedBtn_Click(object sender, RoutedEventArgs e)
+        {
+            var selectedItem = ShellExtensionsGrid.SelectedItem as ShellExtensionItem;
+            if (selectedItem == null)
+            {
+                MessageBox.Show("Lütfen engellemek veya etkinleştirmek istediğiniz öğeyi listeden seçin.", "Seçim Yok", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            try
+            {
+                bool newBlockedState = !selectedItem.IsBlocked;
+                RegistryService.ToggleShellExtension(selectedItem.Clsid, newBlockedState);
+
+                string actionText = newBlockedState ? "devre dışı bırakıldı" : "etkinleştirildi";
+                
+                var confirm = MessageBox.Show(
+                    $"'{selectedItem.KeyName}' öğesi başarıyla {actionText}.\n\n" +
+                    "Değişikliklerin etkili olması için Windows Gezgini'nin (explorer.exe) yeniden başlatılması gerekmektedir.\n\n" +
+                    "Gezgin şimdi yeniden başlatılsın mı?",
+                    "Gezgini Yeniden Başlat",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question);
+
+                if (confirm == MessageBoxResult.Yes)
+                {
+                    RestartExplorer();
+                }
+
+                RefreshAll();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"İşlem sırasında hata oluştu:\n{ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void RefreshExtensionsBtn_Click(object sender, RoutedEventArgs e)
+        {
+            RefreshAll();
+        }
+
+        private string NormalizeExtension(string ext)
+        {
+            if (string.IsNullOrEmpty(ext)) return ".txt";
+            if (!ext.StartsWith(".")) ext = "." + ext;
+            return ext.ToLower();
         }
     }
 }

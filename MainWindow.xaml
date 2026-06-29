@@ -309,13 +309,20 @@
                                 <ComboBoxItem Content="Dosya / Program"/>
                             </ComboBox>
                             
-                            <!-- Target Type (Background, Directory, AllFiles) -->
+                            <!-- Target Type (Background, Directory, AllFiles, FileExtension) -->
                             <TextBlock Text="Hedef Alan (Nerede Görünsün?)" Style="{StaticResource LabelStyle}"/>
-                            <ComboBox x:Name="TargetCombo" Margin="0,0,0,16" SelectedIndex="0">
+                            <ComboBox x:Name="TargetCombo" Margin="0,0,0,16" SelectedIndex="0" SelectionChanged="TargetCombo_SelectionChanged">
                                 <ComboBoxItem Content="Boş Alan (Desktop veya Klasör İçi)"/>
                                 <ComboBoxItem Content="Klasörün Kendisi"/>
                                 <ComboBoxItem Content="Tüm Dosyalar (Herhangi bir dosya)"/>
+                                <ComboBoxItem Content="Belirli Dosya Uzantısı"/>
                             </ComboBox>
+
+                            <!-- Specific Extension Panel -->
+                            <StackPanel x:Name="ExtensionPanel" Visibility="Collapsed" Margin="0,0,0,16">
+                                <TextBlock Text="Dosya Uzantısı (örneğin: .txt)" Style="{StaticResource LabelStyle}"/>
+                                <TextBox x:Name="ExtensionTxt" Height="36" VerticalContentAlignment="Center" Text=".txt"/>
+                            </StackPanel>
                             
                             <!-- Menu Group -->
                             <TextBlock Text="Menü Grubu (Submenu)" Style="{StaticResource LabelStyle}"/>
@@ -476,6 +483,32 @@
                                     </Border>
                                 </StackPanel>
                             </ScrollViewer>
+                        </TabItem>
+                        
+                        <!-- TAB 3: MENU CLEANER -->
+                        <TabItem Header="Menü Temizleme (Temizlik Aracı)">
+                            <Grid Margin="0,10,0,0">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                
+                                <DataGrid x:Name="ShellExtensionsGrid" Grid.Row="0" AutoGenerateColumns="False">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Uygulama / Öğe Adı" Binding="{Binding KeyName}" Width="200"/>
+                                        <DataGridTextColumn Header="Hedef Alan" Binding="{Binding TargetDisplay}" Width="150"/>
+                                        <DataGridCheckBoxColumn Header="Engelli (Devre Dışı)" Binding="{Binding IsBlocked}" Width="140" IsReadOnly="True"/>
+                                        <DataGridTextColumn Header="GUID / CLSID" Binding="{Binding Clsid}" Width="280"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                                
+                                <Grid Grid.Row="1" Margin="0,16,0,0">
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                                        <Button x:Name="ToggleBlockedBtn" Content="Devre Dışı Bırak / Etkinleştir" Width="220" Height="38" Style="{StaticResource PrimaryButtonStyle}" Click="ToggleBlockedBtn_Click"/>
+                                    </StackPanel>
+                                    <Button x:Name="RefreshExtensionsBtn" HorizontalAlignment="Right" Content="Listeyi Yenile" Width="130" Height="38" Style="{StaticResource SecondaryButtonStyle}" Click="RefreshExtensionsBtn_Click"/>
+                                </Grid>
+                            </Grid>
                         </TabItem>
                     </TabControl>
                 </Border>
