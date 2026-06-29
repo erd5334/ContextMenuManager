@@ -300,7 +300,7 @@
                     
                     <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,4,0">
                         <StackPanel>
-                            <TextBlock Text="Yeni Kısayol Ekle" FontSize="16" FontWeight="Bold" Foreground="#0F172A" Margin="0,0,0,16"/>
+                            <TextBlock x:Name="FormTitleLabel" Text="Yeni Kısayol Ekle" FontSize="16" FontWeight="Bold" Foreground="#0F172A" Margin="0,0,0,16"/>
                             
                             <!-- Shortcut Type -->
                             <TextBlock Text="Kısayol Türü" Style="{StaticResource LabelStyle}"/>
@@ -357,8 +357,19 @@
                         </StackPanel>
                     </ScrollViewer>
                     
-                    <!-- Submit Button -->
-                    <Button x:Name="AddBtn" Grid.Row="1" Content="Kısayolu Menüye Ekle" Height="40" Margin="0,10,0,0" Style="{StaticResource PrimaryButtonStyle}" Click="AddBtn_Click"/>
+                    <!-- Submit Buttons -->
+                    <Grid Grid.Row="1" Margin="0,10,0,0">
+                        <Button x:Name="AddBtn" Content="Kısayolu Menüye Ekle" Height="40" Style="{StaticResource PrimaryButtonStyle}" Click="AddBtn_Click"/>
+                        
+                        <Grid x:Name="EditBtnGrid" Visibility="Collapsed">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Button x:Name="SaveEditBtn" Grid.Column="0" Content="Değişiklikleri Kaydet" Height="40" Margin="0,0,6,0" Style="{StaticResource PrimaryButtonStyle}" Click="SaveEditBtn_Click"/>
+                            <Button x:Name="CancelEditBtn" Grid.Column="1" Content="Vazgeç" Height="40" Margin="6,0,0,0" Style="{StaticResource SecondaryButtonStyle}" Click="CancelEditBtn_Click"/>
+                        </Grid>
+                    </Grid>
                 </Grid>
             </Border>
             
@@ -391,7 +402,7 @@
                                 </Grid.RowDefinitions>
                                 
                                 <!-- DataGrid showing shortcuts -->
-                                <DataGrid x:Name="ShortcutsGrid" Grid.Row="0" AutoGenerateColumns="False">
+                                <DataGrid x:Name="ShortcutsGrid" Grid.Row="0" AutoGenerateColumns="False" MouseDoubleClick="ShortcutsGrid_MouseDoubleClick">
                                     <DataGrid.Columns>
                                         <DataGridTextColumn Header="Hedef Alan" Binding="{Binding TargetDisplay}" Width="110"/>
                                         <DataGridTextColumn Header="Grup (Menü)" Binding="{Binding Group}" Width="130"/>
@@ -403,7 +414,10 @@
                                 
                                 <!-- List Buttons -->
                                 <Grid Grid.Row="1" Margin="0,16,0,0">
-                                    <Button x:Name="DeleteBtn" HorizontalAlignment="Left" Content="Seçilen Kısayolu Sil" Width="170" Height="38" Style="{StaticResource DangerButtonStyle}" Click="DeleteBtn_Click"/>
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                                        <Button x:Name="EditBtn" Content="Seçileni Düzenle" Width="150" Height="38" Margin="0,0,10,0" Style="{StaticResource SecondaryButtonStyle}" Click="EditBtn_Click"/>
+                                        <Button x:Name="DeleteBtn" Content="Seçilen Kısayolu Sil" Width="170" Height="38" Style="{StaticResource DangerButtonStyle}" Click="DeleteBtn_Click"/>
+                                    </StackPanel>
                                     <Button x:Name="RefreshBtn" HorizontalAlignment="Right" Content="Listeyi Yenile" Width="130" Height="38" Style="{StaticResource SecondaryButtonStyle}" Click="RefreshBtn_Click"/>
                                 </Grid>
                             </Grid>

@@ -9,6 +9,7 @@ namespace ContextMenuManager
     public partial class MainWindow : Window
     {
         private bool _isInitializing = true;
+        private ShortcutItem? _editingItem = null;
 
         public MainWindow()
         {
@@ -144,21 +145,50 @@ namespace ContextMenuManager
                 return;
             }
 
-            if (isFolder && !Directory.Exists(path))
+            bool isCommand = false;
+            if (isFolder)
             {
-                MessageBox.Show("Belirtilen klasör yolu geçerli değil veya bulunamadı.", "Geçersiz Yol", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
+                if (!Directory.Exists(path))
+                {
+                    var result = MessageBox.Show(
+                        "Belirtilen klasör yolu sistemde bulunamadı. Bunu yine de özel bir komut klasör kısayolu olarak kaydetmek istiyor musunuz?",
+                        "Klasör Yolu Bulunamadı",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Question);
+                    if (result == MessageBoxResult.No) return;
+                    isCommand = true;
+                }
             }
-
-            if (!isFolder && !File.Exists(path))
+            else
             {
-                MessageBox.Show("Belirtilen dosya yolu geçerli değil veya bulunamadı.", "Geçersiz Yol", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
+                if (!File.Exists(path))
+                {
+                    var result = MessageBox.Show(
+                        "Belirtilen dosya/program yolu sistemde bulunamadı. Bunu özel bir komut/argümanlı komut olarak kaydetmek istiyor musunuz?",
+                        "Dosya Yolu Bulunamadı",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Question);
+                    if (result == MessageBoxResult.No) return;
+                    isCommand = true;
+                }
             }
 
             try
             {
-                RegistryService.AddShortcut(name, path, group, isFolder, targetType, position, customIconPath);
+                if (isCommand)
+                {
+                    string iconPath = customIconPath;
+                    if (string.IsNullOrEmpty(iconPath))
+                    {
+                        iconPath = isFolder ? "shell32.dll,3" : "cmd.exe";
+                    }
+                    RegistryService.AddRawShortcut(name, path, iconPath, targetType, position);
+                }
+                else
+                {
+                    RegistryService.AddShortcut(name, path, group, isFolder, targetType, position, customIconPath);
+                }
+                
                 MessageBox.Show($"'{name}' kısayolu başarıyla sağ tık menüsüne eklendi.", "Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
                 
                 NameTxt.Text = string.Empty;
@@ -169,6 +199,173 @@ namespace ContextMenuManager
             catch (Exception ex)
             {
                 MessageBox.Show($"Kısayol eklenirken bir hata oluştu:\n{ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void EditSelected()
+        {
+            var selectedItem = ShortcutsGrid.SelectedItem as ShortcutItem;
+            if (selectedItem == null) return;
+
+            _editingItem = selectedItem;
+
+            // Populate fields
+            NameTxt.Text = selectedItem.Name;
+            PathTxt.Text = selectedItem.Path;
+            GroupCombo.Text = string.IsNullOrEmpty(selectedItem.Group) ? "Ana Menü" : selectedItem.Group;
+            IconTxt.Text = selectedItem.IconPath;
+
+            // Type
+            TypeCombo.SelectedIndex = selectedItem.IsFolder ? 0 : 1;
+
+            // Target type selection
+            TargetCombo.SelectedIndex = selectedItem.TargetType switch
+            {
+                "Background" => 0,
+                "Directory" => 1,
+                "AllFiles" => 2,
+                _ => 0
+            };
+
+            // Position selection
+            PositionCombo.SelectedIndex = selectedItem.Position switch
+            {
+                "Default" => 0,
+                "Top" => 1,
+                "Bottom" => 2,
+                _ => 0
+            };
+
+            // Change UI state to editing
+            FormTitleLabel.Text = "Kısayolu Düzenle";
+            AddBtn.Visibility = Visibility.Collapsed;
+            EditBtnGrid.Visibility = Visibility.Visible;
+        }
+
+        private void CancelEdit()
+        {
+            _editingItem = null;
+            NameTxt.Text = string.Empty;
+            PathTxt.Text = string.Empty;
+            IconTxt.Text = string.Empty;
+            GroupCombo.Text = "Ana Menü";
+            TypeCombo.SelectedIndex = 0;
+            TargetCombo.SelectedIndex = 0;
+            PositionCombo.SelectedIndex = 0;
+
+            FormTitleLabel.Text = "Yeni Kısayol Ekle";
+            AddBtn.Visibility = Visibility.Visible;
+            EditBtnGrid.Visibility = Visibility.Collapsed;
+        }
+
+        private void EditBtn_Click(object sender, RoutedEventArgs e)
+        {
+            var selectedItem = ShortcutsGrid.SelectedItem as ShortcutItem;
+            if (selectedItem == null)
+            {
+                MessageBox.Show("Lütfen düzenlemek istediğiniz kısayolu listeden seçin.", "Seçim Yok", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            EditSelected();
+        }
+
+        private void ShortcutsGrid_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            EditSelected();
+        }
+
+        private void CancelEditBtn_Click(object sender, RoutedEventArgs e)
+        {
+            CancelEdit();
+        }
+
+        private void SaveEditBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (_editingItem == null) return;
+
+            string name = NameTxt.Text.Trim();
+            string path = PathTxt.Text.Trim();
+            string group = GroupCombo.Text.Trim();
+            bool isFolder = TypeCombo.SelectedIndex == 0;
+            string customIconPath = IconTxt.Text.Trim();
+
+            string targetType = TargetCombo.SelectedIndex switch
+            {
+                0 => "Background",
+                1 => "Directory",
+                2 => "AllFiles",
+                _ => "Background"
+            };
+
+            string position = PositionCombo.SelectedIndex switch
+            {
+                0 => "Default",
+                1 => "Top",
+                2 => "Bottom",
+                _ => "Default"
+            };
+
+            if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(path))
+            {
+                MessageBox.Show("Lütfen kısayol adını ve yolunu doldurun.", "Eksik Bilgi", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            bool isCommand = false;
+            if (isFolder)
+            {
+                if (!Directory.Exists(path))
+                {
+                    var result = MessageBox.Show(
+                        "Belirtilen klasör yolu sistemde bulunamadı. Bunu yine de özel bir komut klasör kısayolu olarak kaydetmek istiyor musunuz?",
+                        "Klasör Yolu Bulunamadı",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Question);
+                    if (result == MessageBoxResult.No) return;
+                    isCommand = true;
+                }
+            }
+            else
+            {
+                if (!File.Exists(path))
+                {
+                    var result = MessageBox.Show(
+                        "Belirtilen dosya/program yolu sistemde bulunamadı. Bunu özel bir komut/argümanlı komut olarak kaydetmek istiyor musunuz?",
+                        "Dosya Yolu Bulunamadı",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Question);
+                    if (result == MessageBoxResult.No) return;
+                    isCommand = true;
+                }
+            }
+
+            try
+            {
+                // 1. Delete: Remove old key from registry
+                RegistryService.DeleteShortcut(_editingItem.Id);
+
+                // 2. Re-create: Insert updated data
+                if (isCommand)
+                {
+                    string iconPath = customIconPath;
+                    if (string.IsNullOrEmpty(iconPath))
+                    {
+                        iconPath = isFolder ? "shell32.dll,3" : "cmd.exe";
+                    }
+                    RegistryService.AddRawShortcut(name, path, iconPath, targetType, position);
+                }
+                else
+                {
+                    RegistryService.AddShortcut(name, path, group, isFolder, targetType, position, customIconPath);
+                }
+
+                MessageBox.Show($"'{name}' kısayolu başarıyla güncellendi.", "Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
+                CancelEdit();
+                RefreshAll();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Kısayol güncellenirken bir hata oluştu:\n{ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
