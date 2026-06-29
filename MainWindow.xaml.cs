@@ -21,6 +21,8 @@ namespace ContextMenuManager
         {
             try
             {
+                _isInitializing = true;
+
                 // Load shortcuts and bind to Grid
                 var shortcuts = RegistryService.LoadShortcuts();
                 ShortcutsGrid.ItemsSource = shortcuts;
@@ -30,13 +32,17 @@ namespace ContextMenuManager
                 GroupCombo.ItemsSource = groups;
                 GroupCombo.Text = "Ana Menü";
 
-                // Set initial status of checkboxes without triggering event handlers
+                // Set initial status of checkboxes
                 ClassicMenuChk.IsChecked = RegistryService.CheckClassicMenuStatus();
                 PowerShellChk.IsChecked = RegistryService.CheckPowerShellStatus();
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"Veriler yüklenirken hata oluştu:\n{ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                _isInitializing = false;
             }
         }
 
@@ -88,12 +94,49 @@ namespace ContextMenuManager
             }
         }
 
+        private void IconBrowseBtn_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var dialog = new Microsoft.Win32.OpenFileDialog
+                {
+                    Title = "İkon Görseli veya Kaynağı Seçin",
+                    Filter = "İkon Kaynakları (*.ico;*.exe;*.dll;*.png)|*.ico;*.exe;*.dll;*.png|Tüm Dosyalar (*.*)|*.*"
+                };
+                if (dialog.ShowDialog() == true)
+                {
+                    IconTxt.Text = dialog.FileName;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"İkon seçici açılırken hata oluştu:\n{ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
         private void AddBtn_Click(object sender, RoutedEventArgs e)
         {
             string name = NameTxt.Text.Trim();
             string path = PathTxt.Text.Trim();
             string group = GroupCombo.Text.Trim();
             bool isFolder = TypeCombo.SelectedIndex == 0;
+            string customIconPath = IconTxt.Text.Trim();
+
+            string targetType = TargetCombo.SelectedIndex switch
+            {
+                0 => "Background",
+                1 => "Directory",
+                2 => "AllFiles",
+                _ => "Background"
+            };
+
+            string position = PositionCombo.SelectedIndex switch
+            {
+                0 => "Default",
+                1 => "Top",
+                2 => "Bottom",
+                _ => "Default"
+            };
 
             if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(path))
             {
@@ -115,11 +158,12 @@ namespace ContextMenuManager
 
             try
             {
-                RegistryService.AddShortcut(name, path, group, isFolder);
+                RegistryService.AddShortcut(name, path, group, isFolder, targetType, position, customIconPath);
                 MessageBox.Show($"'{name}' kısayolu başarıyla sağ tık menüsüne eklendi.", "Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
                 
                 NameTxt.Text = string.Empty;
                 PathTxt.Text = string.Empty;
+                IconTxt.Text = string.Empty;
                 RefreshAll();
             }
             catch (Exception ex)
@@ -182,7 +226,6 @@ namespace ContextMenuManager
             catch (Exception ex)
             {
                 MessageBox.Show($"Klasik menü ayarlanırken hata oluştu:\n{ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
-                // Revert checkbox
                 ClassicMenuChk.IsChecked = !ClassicMenuChk.IsChecked;
             }
         }
@@ -205,8 +248,79 @@ namespace ContextMenuManager
             catch (Exception ex)
             {
                 MessageBox.Show($"PowerShell ayarı değiştirilirken hata oluştu:\n{ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
-                // Revert checkbox
                 PowerShellChk.IsChecked = !PowerShellChk.IsChecked;
+            }
+        }
+
+        private void PresetExplorer_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                RegistryService.AddRawShortcut(
+                    "Gezgini Yeniden Başlat", 
+                    @"cmd.exe /c taskkill /f /im explorer.exe & start explorer.exe", 
+                    "shell32.dll,238", 
+                    "Background", 
+                    "Default"
+                );
+                MessageBox.Show("'Gezgini Yeniden Başlat' eylemi sağ tık menüsü boş alanına başarıyla eklendi.", "Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
+                RefreshAll();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Şablon eklenirken hata oluştu:\n{ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void PresetAdminCmd_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // Add to background
+                RegistryService.AddRawShortcut(
+                    "Yönetici Komut İstemi", 
+                    @"powershell.exe -Command ""Start-Process cmd -ArgumentList '/k cd /d %V' -Verb RunAs""", 
+                    "cmd.exe", 
+                    "Background", 
+                    "Default"
+                );
+
+                // Add to directory click
+                RegistryService.AddRawShortcut(
+                    "Yönetici Komut İstemi", 
+                    @"powershell.exe -Command ""Start-Process cmd -ArgumentList '/k cd /d %1' -Verb RunAs""", 
+                    "cmd.exe", 
+                    "Directory", 
+                    "Default"
+                );
+
+                MessageBox.Show("'Yönetici Komut İstemi' eylemi sağ tık menüsüne (boş alan ve klasör) başarıyla eklendi.", "Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
+                RefreshAll();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Şablon eklenirken hata oluştu:\n{ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void PresetTempCleaner_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                string cmdVal = @"powershell.exe -WindowStyle Hidden -Command ""Remove-Item -Path $env:TEMP\* -Recurse -Force -ErrorAction SilentlyContinue; Remove-Item -Path C:\Windows\Temp\* -Recurse -Force -ErrorAction SilentlyContinue""";
+                RegistryService.AddRawShortcut(
+                    "Geçici Dosyaları Temizle", 
+                    cmdVal, 
+                    "shell32.dll,31", 
+                    "Background", 
+                    "Default"
+                );
+                MessageBox.Show("'Geçici Dosyaları Temizle' eylemi sağ tık menüsü boş alanına başarıyla eklendi.", "Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
+                RefreshAll();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Şablon eklenirken hata oluştu:\n{ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 

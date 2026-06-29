@@ -5,9 +5,9 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:ContextMenuManager"
         mc:Ignorable="d"
-        Title="Sağ Tık Menüsü Kısayol Yöneticisi" 
-        Height="720" Width="920" 
-        MinHeight="600" MinWidth="800" 
+        Title="Sağ Tık Yöneticisi" 
+        Height="780" Width="1020" 
+        MinHeight="650" MinWidth="850" 
         WindowStartupLocation="CenterScreen" 
         Background="#F8FAFC" 
         FontSize="14" 
@@ -159,6 +159,49 @@
             <Setter Property="Margin" Value="0,4"/>
         </Style>
 
+        <!-- Modern TabControl Style -->
+        <Style TargetType="TabControl">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0,16,0,0"/>
+        </Style>
+
+        <!-- Modern TabItem Style -->
+        <Style TargetType="TabItem">
+            <Setter Property="HeaderTemplate">
+                <Setter.Value>
+                    <DataTemplate>
+                        <TextBlock Text="{TemplateBinding Content}" FontSize="15" FontWeight="SemiBold"/>
+                    </DataTemplate>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="Padding" Value="20,10"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#64748B"/>
+            <Setter Property="BorderThickness" Value="0,0,0,2"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border x:Name="border" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
+                            <ContentPresenter ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Foreground" Value="#0F172A"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Foreground" Value="#334155"/>
+                                <Setter Property="BorderBrush" Value="#334155"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Modern DataGrid Style -->
         <Style TargetType="DataGrid">
             <Setter Property="Background" Value="White"/>
@@ -235,7 +278,7 @@
             </Grid.ColumnDefinitions>
             <Image Grid.Column="0" Source="Assets/app_icon.png" Width="48" Height="48" Margin="0,0,16,0" VerticalAlignment="Center"/>
             <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                <TextBlock Text="Gelişmiş Sağ Tık Menüsü Yöneticisi" FontSize="26" FontWeight="Bold" Foreground="#0F172A"/>
+                <TextBlock Text="Sağ Tık Yöneticisi" FontSize="26" FontWeight="Bold" Foreground="#0F172A"/>
                 <TextBlock Text="Klasör ve uygulama kısayolları ekleyin, gruplandırın ve Windows 11 sağ tık menüsünü düzenleyin." FontSize="14" Foreground="#64748B" Margin="0,4,0,0"/>
             </StackPanel>
         </Grid>
@@ -243,55 +286,83 @@
         <!-- Main Body Layout -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="340"/>
+                <ColumnDefinition Width="350"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
             
-            <!-- Left Side: Add Shortcut Form -->
+            <!-- Left Side: Add Shortcut Form (Scrollable) -->
             <Border Grid.Column="0" Background="White" CornerRadius="8" BorderBrush="#E2E8F0" BorderThickness="1" Padding="20" Margin="0,0,20,0">
                 <Grid>
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
                     
-                    <StackPanel Grid.Row="0">
-                        <TextBlock Text="Yeni Kısayol Ekle" FontSize="16" FontWeight="Bold" Foreground="#0F172A" Margin="0,0,0,16"/>
-                        
-                        <!-- Shortcut Type -->
-                        <TextBlock Text="Kısayol Türü" Style="{StaticResource LabelStyle}"/>
-                        <ComboBox x:Name="TypeCombo" Margin="0,0,0,16" SelectedIndex="0" SelectionChanged="TypeCombo_SelectionChanged">
-                            <ComboBoxItem Content="Klasör"/>
-                            <ComboBoxItem Content="Dosya / Program"/>
-                        </ComboBox>
-                        
-                        <!-- Menu Group -->
-                        <TextBlock Text="Menü Grubu (Submenu)" Style="{StaticResource LabelStyle}"/>
-                        <ComboBox x:Name="GroupCombo" IsEditable="True" Margin="0,0,0,16" Text="Ana Menü"/>
-                        
-                        <!-- Display Name -->
-                        <TextBlock Text="Menüde Görünecek Ad" Style="{StaticResource LabelStyle}"/>
-                        <TextBox x:Name="NameTxt" Margin="0,0,0,16" Height="36" VerticalContentAlignment="Center"/>
-                        
-                        <!-- Target Path -->
-                        <TextBlock x:Name="PathLabel" Text="Hedef Klasör Yolu" Style="{StaticResource LabelStyle}"/>
-                        <Grid Margin="0,0,0,16">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBox x:Name="PathTxt" Grid.Column="0" Height="36" VerticalContentAlignment="Center" Margin="0,0,8,0"/>
-                            <Button x:Name="BrowseBtn" Grid.Column="1" Content="Gözat..." Width="80" Style="{StaticResource SecondaryButtonStyle}" Click="BrowseBtn_Click"/>
-                        </Grid>
-                    </StackPanel>
+                    <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,4,0">
+                        <StackPanel>
+                            <TextBlock Text="Yeni Kısayol Ekle" FontSize="16" FontWeight="Bold" Foreground="#0F172A" Margin="0,0,0,16"/>
+                            
+                            <!-- Shortcut Type -->
+                            <TextBlock Text="Kısayol Türü" Style="{StaticResource LabelStyle}"/>
+                            <ComboBox x:Name="TypeCombo" Margin="0,0,0,16" SelectedIndex="0" SelectionChanged="TypeCombo_SelectionChanged">
+                                <ComboBoxItem Content="Klasör"/>
+                                <ComboBoxItem Content="Dosya / Program"/>
+                            </ComboBox>
+                            
+                            <!-- Target Type (Background, Directory, AllFiles) -->
+                            <TextBlock Text="Hedef Alan (Nerede Görünsün?)" Style="{StaticResource LabelStyle}"/>
+                            <ComboBox x:Name="TargetCombo" Margin="0,0,0,16" SelectedIndex="0">
+                                <ComboBoxItem Content="Boş Alan (Desktop veya Klasör İçi)"/>
+                                <ComboBoxItem Content="Klasörün Kendisi"/>
+                                <ComboBoxItem Content="Tüm Dosyalar (Herhangi bir dosya)"/>
+                            </ComboBox>
+                            
+                            <!-- Menu Group -->
+                            <TextBlock Text="Menü Grubu (Submenu)" Style="{StaticResource LabelStyle}"/>
+                            <ComboBox x:Name="GroupCombo" IsEditable="True" Margin="0,0,0,16" Text="Ana Menü"/>
+                            
+                            <!-- Display Name -->
+                            <TextBlock Text="Menüde Görünecek Ad" Style="{StaticResource LabelStyle}"/>
+                            <TextBox x:Name="NameTxt" Margin="0,0,0,16" Height="36" VerticalContentAlignment="Center"/>
+                            
+                            <!-- Position Selection -->
+                            <TextBlock Text="Menü Konumu (Sıralama)" Style="{StaticResource LabelStyle}"/>
+                            <ComboBox x:Name="PositionCombo" Margin="0,0,0,16" SelectedIndex="0">
+                                <ComboBoxItem Content="Varsayılan (Alfabetik)"/>
+                                <ComboBoxItem Content="En Üstte (Top)"/>
+                                <ComboBoxItem Content="En Altta (Bottom)"/>
+                            </ComboBox>
+                            
+                            <!-- Target Path -->
+                            <TextBlock x:Name="PathLabel" Text="Hedef Klasör Yolu" Style="{StaticResource LabelStyle}"/>
+                            <Grid Margin="0,0,0,16">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="PathTxt" Grid.Column="0" Height="36" VerticalContentAlignment="Center" Margin="0,0,8,0"/>
+                                <Button x:Name="BrowseBtn" Grid.Column="1" Content="Gözat..." Width="80" Style="{StaticResource SecondaryButtonStyle}" Click="BrowseBtn_Click"/>
+                            </Grid>
+                            
+                            <!-- Custom Icon Path -->
+                            <TextBlock Text="Özel İkon Yolu (İsteğe Bağlı)" Style="{StaticResource LabelStyle}"/>
+                            <Grid Margin="0,0,0,16">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="IconTxt" Grid.Column="0" Height="36" VerticalContentAlignment="Center" Margin="0,0,8,0"/>
+                                <Button x:Name="IconBrowseBtn" Grid.Column="1" Content="Seç..." Width="80" Style="{StaticResource SecondaryButtonStyle}" Click="IconBrowseBtn_Click"/>
+                            </Grid>
+                        </StackPanel>
+                    </ScrollViewer>
                     
                     <!-- Submit Button -->
-                    <Button x:Name="AddBtn" Grid.Row="2" Content="Kısayolu Menüye Ekle" Height="40" Style="{StaticResource PrimaryButtonStyle}" Click="AddBtn_Click"/>
+                    <Button x:Name="AddBtn" Grid.Row="1" Content="Kısayolu Menüye Ekle" Height="40" Margin="0,10,0,0" Style="{StaticResource PrimaryButtonStyle}" Click="AddBtn_Click"/>
                 </Grid>
             </Border>
             
-            <!-- Right Side: Settings & List -->
+            <!-- Right Side: Settings & Tabs -->
             <Grid Grid.Column="1">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -307,32 +378,92 @@
                     </StackPanel>
                 </Border>
                 
-                <!-- Shortcuts List Card -->
+                <!-- TabControl Card -->
                 <Border Grid.Row="1" Background="White" CornerRadius="8" BorderBrush="#E2E8F0" BorderThickness="1" Padding="20">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
+                    <TabControl>
                         
-                        <TextBlock Grid.Row="0" Text="Eklenen Kısayollar" FontSize="16" FontWeight="Bold" Foreground="#0F172A" Margin="0,0,0,16"/>
+                        <!-- TAB 1: SHORTCUTS LIST -->
+                        <TabItem Header="Eklenen Kısayollar">
+                            <Grid Margin="0,10,0,0">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                
+                                <!-- DataGrid showing shortcuts -->
+                                <DataGrid x:Name="ShortcutsGrid" Grid.Row="0" AutoGenerateColumns="False">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Hedef Alan" Binding="{Binding TargetDisplay}" Width="110"/>
+                                        <DataGridTextColumn Header="Grup (Menü)" Binding="{Binding Group}" Width="130"/>
+                                        <DataGridTextColumn Header="Görünecek Ad" Binding="{Binding Name}" Width="160"/>
+                                        <DataGridTextColumn Header="Sıralama" Binding="{Binding Position}" Width="90"/>
+                                        <DataGridTextColumn Header="Hedef Yol" Binding="{Binding Path}" Width="*"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                                
+                                <!-- List Buttons -->
+                                <Grid Grid.Row="1" Margin="0,16,0,0">
+                                    <Button x:Name="DeleteBtn" HorizontalAlignment="Left" Content="Seçilen Kısayolu Sil" Width="170" Height="38" Style="{StaticResource DangerButtonStyle}" Click="DeleteBtn_Click"/>
+                                    <Button x:Name="RefreshBtn" HorizontalAlignment="Right" Content="Listeyi Yenile" Width="130" Height="38" Style="{StaticResource SecondaryButtonStyle}" Click="RefreshBtn_Click"/>
+                                </Grid>
+                            </Grid>
+                        </TabItem>
                         
-                        <!-- DataGrid showing shortcuts -->
-                        <DataGrid x:Name="ShortcutsGrid" Grid.Row="1" AutoGenerateColumns="False">
-                            <DataGrid.Columns>
-                                <DataGridTextColumn Header="Grup (Menü)" Binding="{Binding Group}" Width="150"/>
-                                <DataGridTextColumn Header="Görünecek Ad" Binding="{Binding Name}" Width="180"/>
-                                <DataGridTextColumn Header="Hedef Yol" Binding="{Binding Path}" Width="*"/>
-                            </DataGrid.Columns>
-                        </DataGrid>
-                        
-                        <!-- List Buttons -->
-                        <Grid Grid.Row="2" Margin="0,16,0,0">
-                            <Button x:Name="DeleteBtn" HorizontalAlignment="Left" Content="Seçilen Kısayolu Sil" Width="170" Height="38" Style="{StaticResource DangerButtonStyle}" Click="DeleteBtn_Click"/>
-                            <Button x:Name="RefreshBtn" HorizontalAlignment="Right" Content="Listeyi Yenile" Width="130" Height="38" Style="{StaticResource SecondaryButtonStyle}" Click="RefreshBtn_Click"/>
-                        </Grid>
-                    </Grid>
+                        <!-- TAB 2: QUICK PRESETS -->
+                        <TabItem Header="Hazır Şablonlar (Hızlı Eylemler)">
+                            <ScrollViewer Margin="0,10,0,0" VerticalScrollBarVisibility="Auto">
+                                <StackPanel>
+                                    <!-- Preset 1: Restart Explorer -->
+                                    <Border BorderBrush="#F1F5F9" BorderThickness="0,0,0,1" Padding="0,0,0,16" Margin="0,0,0,16">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="Gezgini Yeniden Başlat" FontSize="15" FontWeight="Bold" Foreground="#334155"/>
+                                                <TextBlock Text="Windows arayüzünü (explorer.exe) sonlandırıp yeniden başlatır. Donma ve takılmaları düzeltir." FontSize="13" Foreground="#64748B" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                                                <TextBlock Text="Konum: Boş Alan (Masaüstü)" FontSize="12" Foreground="#94A3B8" Margin="0,6,0,0" FontWeight="SemiBold"/>
+                                            </StackPanel>
+                                            <Button Grid.Column="1" Content="Menüye Ekle" Width="120" Height="36" Style="{StaticResource SecondaryButtonStyle}" VerticalAlignment="Center" Click="PresetExplorer_Click"/>
+                                        </Grid>
+                                    </Border>
+
+                                    <!-- Preset 2: Open Admin CMD Here -->
+                                    <Border BorderBrush="#F1F5F9" BorderThickness="0,0,0,1" Padding="0,0,0,16" Margin="0,0,0,16">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="Yönetici Komut İstemi (CMD) Burada Aç" FontSize="15" FontWeight="Bold" Foreground="#334155"/>
+                                                <TextBlock Text="Sağ tıkladığınız konumda doğrudan Yönetici olarak çalıştırılmış CMD penceresi başlatır." FontSize="13" Foreground="#64748B" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                                                <TextBlock Text="Konum: Boş Alan ve Klasörün Kendisi (İkisine birden eklenir)" FontSize="12" Foreground="#94A3B8" Margin="0,6,0,0" FontWeight="SemiBold"/>
+                                            </StackPanel>
+                                            <Button Grid.Column="1" Content="Menüye Ekle" Width="120" Height="36" Style="{StaticResource SecondaryButtonStyle}" VerticalAlignment="Center" Click="PresetAdminCmd_Click"/>
+                                        </Grid>
+                                    </Border>
+
+                                    <!-- Preset 3: Temp Cleaner -->
+                                    <Border Padding="0,0,0,8">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="Geçici Dosyaları Temizle (Temp Cleaner)" FontSize="15" FontWeight="Bold" Foreground="#334155"/>
+                                                <TextBlock Text="Bilgisayarınızdaki geçici Windows Temp dosyalarını arka planda PowerShell ile hızlıca siler." FontSize="13" Foreground="#64748B" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                                                <TextBlock Text="Konum: Boş Alan (Masaüstü)" FontSize="12" Foreground="#94A3B8" Margin="0,6,0,0" FontWeight="SemiBold"/>
+                                            </StackPanel>
+                                            <Button Grid.Column="1" Content="Menüye Ekle" Width="120" Height="36" Style="{StaticResource SecondaryButtonStyle}" VerticalAlignment="Center" Click="PresetTempCleaner_Click"/>
+                                        </Grid>
+                                    </Border>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </TabItem>
+                    </TabControl>
                 </Border>
             </Grid>
         </Grid>
