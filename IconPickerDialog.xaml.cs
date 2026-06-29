@@ -17,11 +17,13 @@ namespace ContextMenuManager
         public IconPickerDialog()
         {
             InitializeComponent();
+            SourceCombo.SelectedIndex = 0;
         }
 
         private void SourceCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (SourceCombo == null) return;
+            if (SourceCombo == null || IconsList == null || LoadingLabel == null) return;
+            if (SourceCombo.SelectedIndex == -1) return;
 
             string fileName = SourceCombo.SelectedIndex switch
             {
@@ -37,6 +39,7 @@ namespace ContextMenuManager
 
         private async void LoadIconsFromFile(string filePath)
         {
+            if (IconsList == null || LoadingLabel == null) return;
             if (!File.Exists(filePath)) return;
 
             _currentFilePath = filePath;

@@ -109,7 +109,7 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <TextBlock Grid.Column="0" Text="İkon Kaynağı:" VerticalAlignment="Center" Margin="0,0,10,0" FontWeight="SemiBold" Foreground="#475569"/>
-            <ComboBox x:Name="SourceCombo" Grid.Column="1" Height="36" VerticalContentAlignment="Center" SelectionChanged="SourceCombo_SelectionChanged" SelectedIndex="0">
+            <ComboBox x:Name="SourceCombo" Grid.Column="1" Height="36" VerticalContentAlignment="Center" SelectionChanged="SourceCombo_SelectionChanged">
                 <ComboBoxItem Content="imageres.dll (Modern Sistem İkonları)"/>
                 <ComboBoxItem Content="shell32.dll (Klasik Sistem İkonları)"/>
                 <ComboBoxItem Content="ddores.dll (Aygıt İkonları)"/>
