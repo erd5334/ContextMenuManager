@@ -1,0 +1,22 @@
+## Build outputs
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+bld/
+[Bb]in/
+[Oo]bj/
+
+## Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## Rider/Resharper
+.idea/
+
+## OS Files
+Thumbs.db
+Desktop.ini
