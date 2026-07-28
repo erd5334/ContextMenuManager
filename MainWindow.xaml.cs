@@ -149,7 +149,6 @@ namespace ContextMenuManager
                 return;
             }
 
-            bool isCommand = false;
             if (isFolder)
             {
                 if (!Directory.Exists(path))
@@ -160,7 +159,6 @@ namespace ContextMenuManager
                         MessageBoxButton.YesNo,
                         MessageBoxImage.Question);
                     if (result == MessageBoxResult.No) return;
-                    isCommand = true;
                 }
             }
             else
@@ -173,25 +171,12 @@ namespace ContextMenuManager
                         MessageBoxButton.YesNo,
                         MessageBoxImage.Question);
                     if (result == MessageBoxResult.No) return;
-                    isCommand = true;
                 }
             }
 
             try
             {
-                if (isCommand)
-                {
-                    string iconPath = customIconPath;
-                    if (string.IsNullOrEmpty(iconPath))
-                    {
-                        iconPath = isFolder ? "shell32.dll,3" : "cmd.exe";
-                    }
-                    RegistryService.AddRawShortcut(name, path, iconPath, targetType, position);
-                }
-                else
-                {
-                    RegistryService.AddShortcut(name, path, group, isFolder, targetType, position, customIconPath);
-                }
+                RegistryService.AddShortcut(name, path, group, isFolder, targetType, position, customIconPath);
                 
                 MessageBox.Show($"'{name}' kısayolu başarıyla sağ tık menüsüne eklendi.", "Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
                 
@@ -329,7 +314,6 @@ namespace ContextMenuManager
                 return;
             }
 
-            bool isCommand = false;
             if (isFolder)
             {
                 if (!Directory.Exists(path))
@@ -340,7 +324,6 @@ namespace ContextMenuManager
                         MessageBoxButton.YesNo,
                         MessageBoxImage.Question);
                     if (result == MessageBoxResult.No) return;
-                    isCommand = true;
                 }
             }
             else
@@ -353,7 +336,6 @@ namespace ContextMenuManager
                         MessageBoxButton.YesNo,
                         MessageBoxImage.Question);
                     if (result == MessageBoxResult.No) return;
-                    isCommand = true;
                 }
             }
 
@@ -363,19 +345,7 @@ namespace ContextMenuManager
                 RegistryService.DeleteShortcut(_editingItem.Id);
 
                 // 2. Re-create: Insert updated data
-                if (isCommand)
-                {
-                    string iconPath = customIconPath;
-                    if (string.IsNullOrEmpty(iconPath))
-                    {
-                        iconPath = isFolder ? "shell32.dll,3" : "cmd.exe";
-                    }
-                    RegistryService.AddRawShortcut(name, path, iconPath, targetType, position);
-                }
-                else
-                {
-                    RegistryService.AddShortcut(name, path, group, isFolder, targetType, position, customIconPath);
-                }
+                RegistryService.AddShortcut(name, path, group, isFolder, targetType, position, customIconPath);
 
                 MessageBox.Show($"'{name}' kısayolu başarıyla güncellendi.", "Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
                 CancelEdit();

@@ -245,21 +245,25 @@ namespace ContextMenuManager
         public static void AddShortcut(string name, string path, string group, bool isFolder, string targetType, string position, string customIconPath)
         {
             string rootPath = GetRegistryPath(targetType);
-            string absolutePath = Path.GetFullPath(path);
             string cmdVal;
-            if (targetType == "Background")
+            string absolutePath;
+
+            bool isRaw = IsRawCommand(path, out absolutePath);
+
+            if (isRaw)
             {
-                cmdVal = isFolder ? $@"explorer.exe ""{absolutePath}""" : $@"""{absolutePath}""";
+                cmdVal = path;
             }
-            else // Directory or AllFiles
+            else
             {
-                cmdVal = isFolder ? $@"explorer.exe ""{absolutePath}""" : $@"""{absolutePath}"" ""%1""";
-            }
-            
-            string iconPath = customIconPath;
-            if (string.IsNullOrEmpty(iconPath))
-            {
-                iconPath = isFolder ? "explorer.exe" : absolutePath;
+                if (targetType == "Background")
+                {
+                    cmdVal = isFolder ? $@"explorer.exe ""{absolutePath}""" : $@"""{absolutePath}""";
+                }
+                else // Directory or AllFiles
+                {
+                    cmdVal = isFolder ? $@"explorer.exe ""{absolutePath}""" : $@"""{absolutePath}"" ""%1""";
+                }
             }
 
             string cleanItemName = Regex.Replace(name, @"\W+", "");
@@ -275,7 +279,26 @@ namespace ContextMenuManager
                 using (var key = Registry.CurrentUser.CreateSubKey(fullPath))
                 {
                     key.SetValue("", name);
-                    key.SetValue("Icon", iconPath);
+
+                    // Root item gets custom icon if specified, otherwise its default icon
+                    string itemIcon;
+                    if (!string.IsNullOrEmpty(customIconPath))
+                    {
+                        itemIcon = customIconPath;
+                    }
+                    else
+                    {
+                        if (isRaw)
+                        {
+                            string exePath = ExtractExecutableFromCommand(path);
+                            itemIcon = File.Exists(exePath) ? exePath : (isFolder ? "shell32.dll,3" : "cmd.exe");
+                        }
+                        else
+                        {
+                            itemIcon = isFolder ? "explorer.exe" : absolutePath;
+                        }
+                    }
+                    key.SetValue("Icon", itemIcon);
                     
                     if (position == "Top" || position == "Bottom")
                     {
@@ -311,9 +334,20 @@ namespace ContextMenuManager
                 using (var key = Registry.CurrentUser.CreateSubKey(itemPath))
                 {
                     key.SetValue("", name);
-                    // Gruplar altındaki kısayollar için uygulamanın/klasörün kendi simgesi kullanılır, grubun simgesiyle ezilmez.
-                    string itemIcon = isFolder ? "explorer.exe" : absolutePath;
+
+                    // Inside a group, the item always gets its own default icon, NOT the group's custom icon path!
+                    string itemIcon;
+                    if (isRaw)
+                    {
+                        string exePath = ExtractExecutableFromCommand(path);
+                        itemIcon = File.Exists(exePath) ? exePath : (isFolder ? "shell32.dll,3" : "cmd.exe");
+                    }
+                    else
+                    {
+                        itemIcon = isFolder ? "explorer.exe" : absolutePath;
+                    }
                     key.SetValue("Icon", itemIcon);
+
                     using (var cmdkey = key.CreateSubKey("command"))
                     {
                         cmdkey.SetValue("", cmdVal);
@@ -506,6 +540,50 @@ namespace ContextMenuManager
             {
                 return false;
             }
+        }
+
+        private static bool IsRawCommand(string path, out string absolutePath)
+        {
+            absolutePath = path;
+            if (string.IsNullOrEmpty(path)) return false;
+
+            if (path.StartsWith("\"") || path.Contains(" /") || path.Contains(" -"))
+            {
+                return true;
+            }
+
+            try
+            {
+                absolutePath = Path.GetFullPath(path);
+                return false;
+            }
+            catch
+            {
+                return true;
+            }
+        }
+
+        private static string ExtractExecutableFromCommand(string command)
+        {
+            if (string.IsNullOrEmpty(command)) return string.Empty;
+            command = command.Trim();
+            if (command.StartsWith("\""))
+            {
+                int endQuoteIndex = command.IndexOf("\"", 1);
+                if (endQuoteIndex > 0)
+                {
+                    return command.Substring(1, endQuoteIndex - 1);
+                }
+            }
+            else
+            {
+                int spaceIndex = command.IndexOf(" ");
+                if (spaceIndex > 0)
+                {
+                    return command.Substring(0, spaceIndex);
+                }
+            }
+            return command;
         }
 
         public static List<ShellExtensionItem> LoadShellExtensions()
