@@ -15,6 +15,51 @@ namespace ContextMenuManager
         {
             InitializeComponent();
             _isInitializing = false;
+
+            // Command-line arguments processing
+            string[] args = Environment.GetCommandLineArgs();
+            if (args.Length > 2 && args[1] == "--unlock")
+            {
+                string groupToUnlock = args[2];
+                
+                this.Visibility = Visibility.Hidden;
+                this.ShowInTaskbar = false;
+                this.Width = 0;
+                this.Height = 0;
+                this.WindowStyle = WindowStyle.None;
+                this.Opacity = 0;
+
+                var pw = new PasswordWindow(groupToUnlock);
+                pw.ShowDialog();
+
+                var settings = LockSettings.Load();
+                if (settings.ContainsKey(groupToUnlock))
+                {
+                    var config = settings[groupToUnlock];
+                    var shortcuts = RegistryService.LoadShortcuts();
+                    bool isUnlocked = shortcuts.Exists(s => string.Equals(s.Group, groupToUnlock, StringComparison.OrdinalIgnoreCase));
+                    if (isUnlocked)
+                    {
+                        System.Threading.Tasks.Task.Run(async () =>
+                        {
+                            await System.Threading.Tasks.Task.Delay(config.UnlockDurationSeconds * 1000);
+                            try
+                            {
+                                RegistryService.LockGroup(groupToUnlock);
+                            }
+                            catch { }
+                            Dispatcher.Invoke(() => Application.Current.Shutdown());
+                        });
+                        return;
+                    }
+                }
+
+                Application.Current.Shutdown();
+                return;
+            }
+
+            // Normal Startup: Check and lock all groups (self-healing)
+            RegistryService.CheckAndLockAllGroups();
             RefreshAll();
         }
 
@@ -30,8 +75,22 @@ namespace ContextMenuManager
 
                 // Load groups and bind to ComboBox
                 var groups = RegistryService.GetExistingGroups();
-                GroupCombo.ItemsSource = groups;
+                
+                var comboGroups = new List<string>(groups);
+                GroupCombo.ItemsSource = comboGroups;
                 GroupCombo.Text = "Ana Menü";
+
+                var lockableGroups = new List<string>(groups);
+                lockableGroups.Remove("Ana Menü");
+                LockGroupCombo.ItemsSource = lockableGroups;
+                if (lockableGroups.Count > 0)
+                {
+                    LockGroupCombo.SelectedIndex = 0;
+                }
+
+                // Load locked groups
+                var lockedGroups = LockSettings.Load();
+                LockedGroupsList.ItemsSource = lockedGroups;
 
                 // Load shell extensions and bind to Grid
                 var shellExtensions = RegistryService.LoadShellExtensions();
@@ -585,6 +644,80 @@ namespace ContextMenuManager
             if (string.IsNullOrEmpty(ext)) return ".txt";
             if (!ext.StartsWith(".")) ext = "." + ext;
             return ext.ToLower();
+        }
+
+        private void LockGroupBtn_Click(object sender, RoutedEventArgs e)
+        {
+            string? groupName = LockGroupCombo.SelectedItem as string;
+            if (string.IsNullOrEmpty(groupName))
+            {
+                MessageBox.Show("Lütfen kilitlemek istediğiniz grubu seçin.", "Seçim Yok", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            string password = LockPasswordTxt.Password;
+            if (string.IsNullOrEmpty(password))
+            {
+                MessageBox.Show("Lütfen grubu korumak için bir şifre girin.", "Eksik Bilgi", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            string durationStr = LockDurationTxt.Text.Trim();
+            if (!int.TryParse(durationStr, out int duration) || duration <= 0)
+            {
+                MessageBox.Show("Lütfen açık kalma süresi için geçerli bir saniye değeri girin (örn: 90).", "Geçersiz Süre", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            try
+            {
+                RegistryService.LockGroup(groupName, password, duration);
+                MessageBox.Show($"'{groupName}' grubu başarıyla şifrelenerek kilitlendi.", "Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
+                
+                LockPasswordTxt.Clear();
+                RefreshAll();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Grup kilitlenirken bir hata oluştu:\n{ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void UnlockPermanentlyBtn_Click(object sender, RoutedEventArgs e)
+        {
+            var selected = LockedGroupsList.SelectedItem;
+            if (selected == null)
+            {
+                MessageBox.Show("Lütfen kalıcı olarak kilidini kaldırmak istediğiniz grubu listeden seçin.", "Seçim Yok", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (selected is System.Collections.Generic.KeyValuePair<string, LockedGroup> pair)
+            {
+                string groupName = pair.Key;
+
+                var confirm = MessageBox.Show($"'{groupName}' grubunun şifre korumasını kalıcı olarak kaldırmak ve tüm kısayollarını görünür yapmak istediğinize emin misiniz?", "Kilidi Kaldır", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                if (confirm != MessageBoxResult.Yes) return;
+
+                try
+                {
+                    RegistryService.UnlockGroup(groupName);
+
+                    var settings = LockSettings.Load();
+                    if (settings.ContainsKey(groupName))
+                    {
+                        settings.Remove(groupName);
+                        LockSettings.Save(settings);
+                    }
+
+                    MessageBox.Show($"'{groupName}' grubunun kilidi kalıcı olarak kaldırıldı.", "Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
+                    RefreshAll();
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Kilidi kaldırırken bir hata oluştu:\n{ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
         }
     }
 }

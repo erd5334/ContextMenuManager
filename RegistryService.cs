@@ -365,6 +365,275 @@ namespace ContextMenuManager
             }
         }
 
+        [System.Runtime.InteropServices.DllImport("shell32.dll", CharSet = System.Runtime.InteropServices.CharSet.Auto, SetLastError = true)]
+        private static extern void SHChangeNotify(int wEventId, int uFlags, IntPtr dwItem1, IntPtr dwItem2);
+
+        private const int SHCNE_ASSOCCHANGED = 0x08000000;
+        private const int SHCNF_FLUSH = 0x1000;
+
+        public static void RefreshExplorer()
+        {
+            try
+            {
+                SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_FLUSH, IntPtr.Zero, IntPtr.Zero);
+            }
+            catch { }
+        }
+
+        public static void LockGroup(string groupName)
+        {
+            var settings = LockSettings.Load();
+            if (settings.ContainsKey(groupName))
+            {
+                LockGroupInternal(groupName, settings[groupName]);
+            }
+        }
+
+        public static void LockGroup(string groupName, string password, int durationSeconds)
+        {
+            var allShortcuts = LoadShortcuts();
+            var groupItems = allShortcuts.FindAll(s => string.Equals(s.Group, groupName, StringComparison.OrdinalIgnoreCase));
+            if (groupItems.Count == 0)
+            {
+                throw new Exception($"'{groupName}' grubuna ait kısayol bulunamadı. Boş bir grup kilitlenemez.");
+            }
+
+            var lockedItems = new List<LockedItem>();
+            var targetsUsed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            
+            string groupIcon = string.Empty;
+            string groupPosition = string.Empty;
+            string cleanGroupName = Regex.Replace(groupName, @"\W+", "");
+            string groupKeyName = $"CustomGroup_{cleanGroupName}";
+
+            foreach (var item in groupItems)
+            {
+                string rawCommand = string.Empty;
+                string rootRegPath = GetRegistryPath(item.TargetType);
+                
+                string[] parts = item.Id.Split('|');
+                if (parts.Length == 2)
+                {
+                    string subkeyPath = $@"{rootRegPath}\{parts[1]}\command";
+                    using (var cmdKey = Registry.CurrentUser.OpenSubKey(subkeyPath))
+                    {
+                        if (cmdKey != null)
+                        {
+                            rawCommand = cmdKey.GetValue("")?.ToString() ?? string.Empty;
+                        }
+                    }
+                    
+                    if (string.IsNullOrEmpty(groupIcon) || string.IsNullOrEmpty(groupPosition))
+                    {
+                        string groupPath = $@"{rootRegPath}\{groupKeyName}";
+                        using (var gkey = Registry.CurrentUser.OpenSubKey(groupPath))
+                        {
+                            if (gkey != null)
+                            {
+                                groupIcon = gkey.GetValue("Icon")?.ToString() ?? groupIcon;
+                                groupPosition = gkey.GetValue("Position")?.ToString() ?? groupPosition;
+                            }
+                        }
+                    }
+                }
+
+                if (string.IsNullOrEmpty(rawCommand))
+                {
+                    rawCommand = item.Path;
+                }
+
+                lockedItems.Add(new LockedItem
+                {
+                    Name = item.Name,
+                    Path = rawCommand,
+                    IsFolder = item.IsFolder,
+                    TargetType = item.TargetType,
+                    Position = item.Position,
+                    IconPath = item.IconPath
+                });
+
+                targetsUsed.Add(item.TargetType);
+            }
+
+            var config = new LockedGroup
+            {
+                PasswordHash = LockSettings.ComputeSha256(password),
+                UnlockDurationSeconds = durationSeconds,
+                GroupIconPath = groupIcon,
+                GroupPosition = groupPosition,
+                Items = lockedItems
+            };
+
+            LockGroupInternal(groupName, config);
+        }
+
+        private static void LockGroupInternal(string groupName, LockedGroup config)
+        {
+            string cleanGroupName = Regex.Replace(groupName, @"\W+", "");
+            string groupKeyName = $"CustomGroup_{cleanGroupName}";
+            string lockedKeyName = $"CustomFolder_LockedGroup_{cleanGroupName}";
+
+            string exePath = Environment.ProcessPath ?? "ContextMenuManager.exe";
+
+            // Save settings
+            var settings = LockSettings.Load();
+            settings[groupName] = config;
+            LockSettings.Save(settings);
+
+            var targetsUsed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var item in config.Items)
+            {
+                targetsUsed.Add(item.TargetType);
+            }
+
+            foreach (var targetType in targetsUsed)
+            {
+                string rootRegPath = GetRegistryPath(targetType);
+
+                // Delete custom group
+                try
+                {
+                    Registry.CurrentUser.DeleteSubKeyTree($@"{rootRegPath}\{groupKeyName}", false);
+                }
+                catch { }
+
+                // Create kilitli tekli buton (CustomFolder)
+                string lockedPath = $@"{rootRegPath}\{lockedKeyName}";
+                using (var key = Registry.CurrentUser.CreateSubKey(lockedPath))
+                {
+                    key.SetValue("", $"{groupName} (Kilitli)");
+                    key.SetValue("Icon", "shell32.dll,47"); // Lock icon
+
+                    if (!string.IsNullOrEmpty(config.GroupPosition))
+                    {
+                        key.SetValue("Position", config.GroupPosition);
+                    }
+
+                    using (var cmdKey = key.CreateSubKey("command"))
+                    {
+                        cmdKey.SetValue("", $@"""{exePath}"" --unlock ""{groupName}""");
+                    }
+                }
+            }
+
+            RefreshExplorer();
+        }
+
+        public static void UnlockGroup(string groupName)
+        {
+            var settings = LockSettings.Load();
+            if (!settings.ContainsKey(groupName))
+            {
+                throw new Exception($"'{groupName}' grubuna ait kilit ayarları bulunamadı.");
+            }
+
+            var groupConfig = settings[groupName];
+            string cleanGroupName = Regex.Replace(groupName, @"\W+", "");
+            string groupKeyName = $"CustomGroup_{cleanGroupName}";
+            string lockedKeyName = $"CustomFolder_LockedGroup_{cleanGroupName}";
+
+            var targetsUsed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var item in groupConfig.Items)
+            {
+                string rootRegPath = GetRegistryPath(item.TargetType);
+                targetsUsed.Add(item.TargetType);
+
+                // Create custom group key
+                string groupPath = $@"{rootRegPath}\{groupKeyName}";
+                using (var gkey = Registry.CurrentUser.CreateSubKey(groupPath))
+                {
+                    gkey.SetValue("MUIVerb", groupName);
+                    gkey.SetValue("SubCommands", "");
+                    
+                    if (!string.IsNullOrEmpty(groupConfig.GroupIconPath))
+                    {
+                        gkey.SetValue("Icon", groupConfig.GroupIconPath);
+                    }
+                    else
+                    {
+                        gkey.SetValue("Icon", "shell32.dll,3"); // default folder
+                    }
+
+                    if (!string.IsNullOrEmpty(groupConfig.GroupPosition))
+                    {
+                        gkey.SetValue("Position", groupConfig.GroupPosition);
+                    }
+                }
+
+                // Create item subkey
+                string cleanItemName = Regex.Replace(item.Name, @"\W+", "");
+                long unixTimestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+                string itemKeyName = $"CustomItem_{cleanItemName}_{unixTimestamp}";
+
+                string itemPath = $@"{groupPath}\shell\{itemKeyName}";
+                using (var key = Registry.CurrentUser.CreateSubKey(itemPath))
+                {
+                    key.SetValue("", item.Name);
+                    
+                    if (!string.IsNullOrEmpty(item.IconPath))
+                    {
+                        key.SetValue("Icon", item.IconPath);
+                    }
+                    else
+                    {
+                        string exePath = ExtractExecutableFromCommand(item.Path);
+                        key.SetValue("Icon", File.Exists(exePath) ? exePath : (item.IsFolder ? "explorer.exe" : "cmd.exe"));
+                    }
+
+                    using (var cmdKey = key.CreateSubKey("command"))
+                    {
+                        cmdKey.SetValue("", item.Path);
+                    }
+                }
+            }
+
+            // Remove kilitli tekli buton (CustomFolder_LockedGroup_*)
+            foreach (var targetType in targetsUsed)
+            {
+                string rootRegPath = GetRegistryPath(targetType);
+                try
+                {
+                    Registry.CurrentUser.DeleteSubKeyTree($@"{rootRegPath}\{lockedKeyName}", false);
+                }
+                catch { }
+            }
+
+            RefreshExplorer();
+        }
+
+        public static void StartLockTimer(string groupName, int durationSeconds)
+        {
+            System.Threading.Tasks.Task.Run(async () =>
+            {
+                await System.Threading.Tasks.Task.Delay(durationSeconds * 1000);
+                try
+                {
+                    LockGroup(groupName);
+                }
+                catch { }
+            });
+        }
+
+        public static void CheckAndLockAllGroups()
+        {
+            try
+            {
+                var settings = LockSettings.Load();
+                var allShortcuts = LoadShortcuts();
+
+                foreach (var groupName in settings.Keys)
+                {
+                    bool isUnlocked = allShortcuts.Exists(s => string.Equals(s.Group, groupName, StringComparison.OrdinalIgnoreCase));
+                    if (isUnlocked)
+                    {
+                        LockGroupInternal(groupName, settings[groupName]);
+                    }
+                }
+            }
+            catch { }
+        }
+
         public static void AddRawShortcut(string name, string command, string icon, string targetType, string position)
         {
             string rootPath = GetRegistryPath(targetType);
