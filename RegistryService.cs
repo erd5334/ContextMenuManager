@@ -311,7 +311,9 @@ namespace ContextMenuManager
                 using (var key = Registry.CurrentUser.CreateSubKey(itemPath))
                 {
                     key.SetValue("", name);
-                    key.SetValue("Icon", iconPath);
+                    // Gruplar altındaki kısayollar için uygulamanın/klasörün kendi simgesi kullanılır, grubun simgesiyle ezilmez.
+                    string itemIcon = isFolder ? "explorer.exe" : absolutePath;
+                    key.SetValue("Icon", itemIcon);
                     using (var cmdkey = key.CreateSubKey("command"))
                     {
                         cmdkey.SetValue("", cmdVal);
