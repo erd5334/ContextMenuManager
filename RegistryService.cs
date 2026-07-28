@@ -322,7 +322,16 @@ namespace ContextMenuManager
                 {
                     gkey.SetValue("MUIVerb", group);
                     gkey.SetValue("SubCommands", "");
-                    gkey.SetValue("Icon", !string.IsNullOrEmpty(customIconPath) ? customIconPath : "shell32.dll,3"); // folder icon
+                    // Grup simgesini sadece formda yeni bir simge seçildiyse güncelleriz, 
+                    // aksi halde grubun mevcut simgesini bozmayıp koruruz (yeni grup ise varsayılan sarı klasör simgesi verilir).
+                    if (!string.IsNullOrEmpty(customIconPath))
+                    {
+                        gkey.SetValue("Icon", customIconPath);
+                    }
+                    else if (gkey.GetValue("Icon") == null)
+                    {
+                        gkey.SetValue("Icon", "shell32.dll,3"); // varsayılan klasör simgesi
+                    }
 
                     if (position == "Top" || position == "Bottom")
                     {
