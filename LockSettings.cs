@@ -69,7 +69,6 @@ namespace ContextMenuManager
                 }
 
                 string json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
-                File.ReadAllText(SettingsFile); // check read
                 File.WriteAllText(SettingsFile, json);
             }
             catch (Exception ex)

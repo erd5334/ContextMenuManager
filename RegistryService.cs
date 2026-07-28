@@ -630,6 +630,45 @@ namespace ContextMenuManager
                         LockGroupInternal(groupName, settings[groupName]);
                     }
                 }
+
+                // Clean up orphan locked keys (keys that exist in registry but not in JSON)
+                string[] paths = { REG_PATH_BG, REG_PATH_DIR, REG_PATH_FILE };
+                foreach (var regPath in paths)
+                {
+                    using (var key = Registry.CurrentUser.OpenSubKey(regPath, true))
+                    {
+                        if (key != null)
+                        {
+                            foreach (var subkeyName in key.GetSubKeyNames())
+                            {
+                                if (subkeyName.StartsWith("CustomFolder_LockedGroup_"))
+                                {
+                                    string cleanGroupName = subkeyName.Replace("CustomFolder_LockedGroup_", "");
+                                    
+                                    bool existsInJson = false;
+                                    foreach (var groupName in settings.Keys)
+                                    {
+                                        string clean = Regex.Replace(groupName, @"\W+", "");
+                                        if (string.Equals(clean, cleanGroupName, StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            existsInJson = true;
+                                            break;
+                                        }
+                                    }
+
+                                    if (!existsInJson)
+                                    {
+                                        try
+                                        {
+                                            key.DeleteSubKeyTree(subkeyName, false);
+                                        }
+                                        catch { }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
             catch { }
         }
