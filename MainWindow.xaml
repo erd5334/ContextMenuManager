@@ -155,23 +155,142 @@
             </Setter>
         </Style>
 
-        <!-- Modern ComboBox Style -->
+        <!-- Modern ComboBox Style with Custom Template -->
         <Style TargetType="ComboBox">
             <Setter Property="Background" Value="{DynamicResource InputBgBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource InputTextBrush}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="Padding" Value="10,6"/>
             <Setter Property="Height" Value="36"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="IsEditable" Value="True"/>
-            <Setter Property="IsReadOnly" Value="True"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid x:Name="templateRoot" SnapsToDevicePixels="true" TextElement.Foreground="{TemplateBinding Foreground}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition MinWidth="{x:Static SystemParameters.VerticalScrollBarWidth}" Width="0"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <!-- Toggle Button that covers the entire ComboBox -->
+                            <ToggleButton x:Name="toggleButton" 
+                                          Grid.ColumnSpan="2" 
+                                          Background="{TemplateBinding Background}" 
+                                          BorderBrush="{TemplateBinding BorderBrush}" 
+                                          BorderThickness="{TemplateBinding BorderThickness}" 
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" 
+                                          ClickMode="Press"
+                                          Cursor="Hand">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border x:Name="templateBorder" 
+                                                Background="{TemplateBinding Background}" 
+                                                BorderBrush="{TemplateBinding BorderBrush}" 
+                                                BorderThickness="{TemplateBinding BorderThickness}" 
+                                                CornerRadius="6" 
+                                                SnapsToDevicePixels="true">
+                                            <Grid HorizontalAlignment="Right" Width="30">
+                                                <!-- Dropdown arrow icon -->
+                                                <Path x:Name="arrow" 
+                                                      Data="M 0 0 L 4 4 L 8 0 Z" 
+                                                      Fill="{DynamicResource SecondaryTextBrush}" 
+                                                      HorizontalAlignment="Center" 
+                                                      VerticalAlignment="Center"/>
+                                            </Grid>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="true">
+                                                <Setter Property="Background" Value="{DynamicResource WindowBgBrush}"/>
+                                                <Setter Property="BorderBrush" Value="#94A3B8"/>
+                                            </Trigger>
+                                            <Trigger Property="IsChecked" Value="true">
+                                                <Setter Property="Background" Value="{DynamicResource WindowBgBrush}"/>
+                                                <Setter Property="BorderBrush" Value="#64748B"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            
+                            <!-- Content Area -->
+                            <ContentPresenter x:Name="contentPresenter" 
+                                              ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" 
+                                              Content="{TemplateBinding SelectionBoxItem}" 
+                                              ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}" 
+                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" 
+                                              IsHitTestVisible="false" 
+                                              Margin="{TemplateBinding Padding}" 
+                                              SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" 
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                            
+                            <!-- Popup containing the dropdown items -->
+                            <Popup x:Name="PART_Popup" 
+                                   AllowsTransparency="true" 
+                                   Grid.ColumnSpan="2" 
+                                   IsOpen="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" 
+                                   Margin="1" 
+                                   Placement="Bottom" 
+                                   PopupAnimation="{DynamicResource {x:Static SystemParameters.ComboBoxPopupAnimationKey}}">
+                                <Border x:Name="dropDownBorder" 
+                                        Background="{DynamicResource CardBgBrush}" 
+                                        BorderBrush="{DynamicResource BorderBrush}" 
+                                        BorderThickness="1" 
+                                        CornerRadius="6" 
+                                        MaxHeight="{TemplateBinding MaxDropDownHeight}" 
+                                        MinWidth="{Binding ActualWidth, ElementName=templateRoot}">
+                                    <ScrollViewer x:Name="DropDownScrollViewer">
+                                        <Grid x:Name="grid" RenderOptions.ClearTypeHint="Enabled">
+                                            <Canvas x:Name="canvas" HorizontalAlignment="Left" Height="0" VerticalAlignment="Top" Width="0">
+                                                <Rectangle x:Name="opaqueRect" 
+                                                           Fill="{Binding Background, ElementName=dropDownBorder}" 
+                                                           Height="{Binding ActualHeight, ElementName=dropDownBorder}" 
+                                                           Width="{Binding ActualWidth, ElementName=dropDownBorder}"/>
+                                            </Canvas>
+                                            <ItemsPresenter x:Name="ItemsPresenter" 
+                                                            KeyboardNavigation.DirectionalNavigation="Contained" 
+                                                            SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                                        </Grid>
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="HasItems" Value="false">
+                                <Setter Property="Height" TargetName="dropDownBorder" Value="95"/>
+                            </Trigger>
+                            <Trigger Property="IsGrouping" Value="true">
+                                <Setter Property="ScrollViewer.CanContentScroll" Value="false"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <Style TargetType="ComboBoxItem">
             <Setter Property="Background" Value="{DynamicResource CardBgBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}"/>
-            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBoxItem">
+                        <Border x:Name="itemBorder" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}" SnapsToDevicePixels="true">
+                            <ContentPresenter/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="true">
+                                <Setter Property="Background" TargetName="itemBorder" Value="{DynamicResource WindowBgBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="true">
+                                <Setter Property="Background" TargetName="itemBorder" Value="#E2E8F0"/>
+                                <Setter Property="Foreground" Value="#0F172A"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <!-- Modern CheckBox Style -->
@@ -356,7 +475,7 @@
                             
                             <!-- Menu Group -->
                             <TextBlock Text="Menü Grubu (Submenu)" Style="{StaticResource LabelStyle}"/>
-                            <ComboBox x:Name="GroupCombo" IsEditable="True" IsReadOnly="False" Margin="0,0,0,16" Text="Ana Menü"/>
+                            <ComboBox x:Name="GroupCombo" IsEditable="False" Margin="0,0,0,16" Text="Ana Menü"/>
                             
                             <!-- Display Name -->
                             <TextBlock Text="Menüde Görünecek Ad" Style="{StaticResource LabelStyle}"/>
