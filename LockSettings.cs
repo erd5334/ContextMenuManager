@@ -54,7 +54,7 @@ namespace ContextMenuManager
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Ayarlar yüklenirken hata oluştu: {ex.Message}");
+                System.Windows.MessageBox.Show($"Ayarlar yüklenirken hata oluştu:\n{ex.Message}", "Yükleme Hatası", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
                 return new Dictionary<string, LockedGroup>(StringComparer.OrdinalIgnoreCase);
             }
         }
@@ -73,7 +73,7 @@ namespace ContextMenuManager
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Ayarlar kaydedilirken hata oluştu: {ex.Message}");
+                System.Windows.MessageBox.Show($"Ayarlar kaydedilirken hata oluştu:\n{ex.Message}", "Kaydetme Hatası", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
             }
         }
 
