@@ -906,9 +906,9 @@ namespace ContextMenuManager
         public static List<ShellExtensionItem> LoadShellExtensions()
         {
             var list = new List<ShellExtensionItem>();
-            var uniqueClsids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var uniqueKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            // Read blocked extensions list
+            // 1. Load ContextMenuHandlers (Shell Extensions)
             var blockedClsids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             try
             {
@@ -977,19 +977,105 @@ namespace ContextMenuManager
                                         continue;
                                     }
 
-                                    string uniqueKey = $"{clsid}|{path}";
-                                    if (!uniqueClsids.Contains(uniqueKey))
+                                    string uniqueKey = $"Ext|{clsid}|{path}";
+                                    if (!uniqueKeys.Contains(uniqueKey))
                                     {
-                                        uniqueClsids.Add(uniqueKey);
+                                        uniqueKeys.Add(uniqueKey);
                                         list.Add(new ShellExtensionItem
                                         {
                                             KeyName = subkeyName,
                                             Clsid = clsid,
                                             RegistryPath = $@"HKCR\{path}\{subkeyName}",
                                             TargetDisplay = targetDisplay,
-                                            IsBlocked = blockedClsids.Contains(clsid)
+                                            IsBlocked = blockedClsids.Contains(clsid),
+                                            IsStatic = false
                                         });
                                     }
+                                }
+                            }
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            // 2. Load Static Commands (shell keys)
+            string[] shellPaths = {
+                @"*\shell",
+                @"Directory\shell",
+                @"Directory\Background\shell"
+            };
+
+            foreach (var path in shellPaths)
+            {
+                string targetDisplay = path switch
+                {
+                    @"*\shell" => "Tüm Dosyalar",
+                    @"Directory\shell" => "Klasör",
+                    @"Directory\Background\shell" => "Boş Alan",
+                    _ => "Diğer"
+                };
+
+                try
+                {
+                    using (var key = Registry.ClassesRoot.OpenSubKey(path))
+                    {
+                        if (key != null)
+                        {
+                            foreach (var subkeyName in key.GetSubKeyNames())
+                            {
+                                // Skip our own custom shortcuts and system commands
+                                if (subkeyName.StartsWith("CustomFolder_") || 
+                                    subkeyName.StartsWith("CustomGroup_") || 
+                                    subkeyName.Equals("PowershellAlways", StringComparison.OrdinalIgnoreCase) ||
+                                    subkeyName.Equals("cmd", StringComparison.OrdinalIgnoreCase) ||
+                                    subkeyName.Equals("Powershell", StringComparison.OrdinalIgnoreCase) ||
+                                    subkeyName.Equals("find", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    continue;
+                                }
+
+                                string displayName = subkeyName;
+                                using (var subkey = key.OpenSubKey(subkeyName))
+                                {
+                                    if (subkey != null)
+                                    {
+                                        string rawName = subkey.GetValue("MUIVerb")?.ToString() ?? subkey.GetValue("")?.ToString() ?? subkeyName;
+                                        if (!string.IsNullOrEmpty(rawName) && !rawName.StartsWith("@"))
+                                        {
+                                            displayName = rawName.Replace("&", "");
+                                        }
+                                    }
+                                }
+
+                                // Check if blocked under HKCU
+                                bool isBlocked = false;
+                                string hkcuPath = $@"Software\Classes\{path}\{subkeyName}";
+                                try
+                                {
+                                    using (var hkcuKey = Registry.CurrentUser.OpenSubKey(hkcuPath))
+                                    {
+                                        if (hkcuKey != null)
+                                        {
+                                            isBlocked = hkcuKey.GetValue("LegacyDisable") != null;
+                                        }
+                                    }
+                                }
+                                catch { }
+
+                                string uniqueKey = $"Static|{subkeyName}|{path}";
+                                if (!uniqueKeys.Contains(uniqueKey))
+                                {
+                                    uniqueKeys.Add(uniqueKey);
+                                    list.Add(new ShellExtensionItem
+                                    {
+                                        KeyName = displayName,
+                                        Clsid = subkeyName,
+                                        RegistryPath = $@"HKCR\{path}\{subkeyName}",
+                                        TargetDisplay = targetDisplay,
+                                        IsBlocked = isBlocked,
+                                        IsStatic = true
+                                    });
                                 }
                             }
                         }
@@ -1030,26 +1116,179 @@ namespace ContextMenuManager
             return false;
         }
 
-        public static void ToggleShellExtension(string clsid, bool block)
+        public static void ToggleShellExtension(string idOrClsid, bool block, bool isStatic, string registryPath)
         {
-            string blockedKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Shell Extensions\Blocked";
-            if (block)
+            if (isStatic)
             {
-                using (var key = Registry.CurrentUser.CreateSubKey(blockedKeyPath))
+                string prefix = @"HKCR\";
+                if (registryPath.StartsWith(prefix))
                 {
-                    key.SetValue(clsid, "");
+                    string relativePath = registryPath.Substring(prefix.Length);
+                    string hkcuPath = $@"Software\Classes\{relativePath}";
+
+                    if (block)
+                    {
+                        using (var key = Registry.CurrentUser.CreateSubKey(hkcuPath))
+                        {
+                            key.SetValue("LegacyDisable", "");
+                        }
+                    }
+                    else
+                    {
+                        using (var key = Registry.CurrentUser.OpenSubKey(hkcuPath, true))
+                        {
+                            if (key != null)
+                            {
+                                try { key.DeleteValue("LegacyDisable"); } catch { }
+
+                                // Clean up if key is completely empty
+                                if (key.SubKeyCount == 0 && key.ValueCount == 0)
+                                {
+                                    try
+                                    {
+                                        Registry.CurrentUser.DeleteSubKey(hkcuPath, false);
+                                    }
+                                    catch { }
+                                }
+                            }
+                        }
+                    }
                 }
             }
             else
             {
-                using (var key = Registry.CurrentUser.OpenSubKey(blockedKeyPath, true))
+                string blockedKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Shell Extensions\Blocked";
+                if (block)
                 {
-                    if (key != null)
+                    using (var key = Registry.CurrentUser.CreateSubKey(blockedKeyPath))
                     {
-                        try { key.DeleteValue(clsid); } catch { }
+                        key.SetValue(idOrClsid, "");
+                    }
+                }
+                else
+                {
+                    using (var key = Registry.CurrentUser.OpenSubKey(blockedKeyPath, true))
+                    {
+                        if (key != null)
+                        {
+                            try { key.DeleteValue(idOrClsid); } catch { }
+                        }
                     }
                 }
             }
+        }
+
+        public static List<CustomGroupItem> LoadCustomGroups()
+        {
+            var groups = new List<CustomGroupItem>();
+
+            groups.AddRange(LoadCustomGroupsFromKey(REG_PATH_BG, "Background", "Boş Alan"));
+            groups.AddRange(LoadCustomGroupsFromKey(REG_PATH_DIR, "Directory", "Klasör"));
+            groups.AddRange(LoadCustomGroupsFromKey(REG_PATH_FILE, "AllFiles", "Tüm Dosyalar"));
+
+            try
+            {
+                using (var baseKey = Registry.CurrentUser.OpenSubKey(@"Software\Classes\SystemFileAssociations"))
+                {
+                    if (baseKey != null)
+                    {
+                        foreach (var ext in baseKey.GetSubKeyNames())
+                        {
+                            string shellPath = $@"Software\Classes\SystemFileAssociations\{ext}\shell";
+                            groups.AddRange(LoadCustomGroupsFromKey(shellPath, $"FileExtension:{ext}", $"Uzantı ({ext})"));
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            return groups;
+        }
+
+        private static List<CustomGroupItem> LoadCustomGroupsFromKey(string regPath, string targetType, string targetDisplay)
+        {
+            var list = new List<CustomGroupItem>();
+            try
+            {
+                using (var key = Registry.CurrentUser.OpenSubKey(regPath))
+                {
+                    if (key != null)
+                    {
+                        foreach (var subkeyName in key.GetSubKeyNames())
+                        {
+                            if (subkeyName.StartsWith("CustomGroup_"))
+                            {
+                                using (var subkey = key.OpenSubKey(subkeyName))
+                                {
+                                    if (subkey != null)
+                                    {
+                                        string name = subkey.GetValue("MUIVerb")?.ToString() ?? subkeyName.Replace("CustomGroup_", "");
+                                        string iconPath = subkey.GetValue("Icon")?.ToString() ?? string.Empty;
+                                        string position = subkey.GetValue("Position")?.ToString() ?? "Default";
+
+                                        list.Add(new CustomGroupItem
+                                        {
+                                            Id = $"{targetType}|{subkeyName}",
+                                            Name = name,
+                                            TargetType = targetType,
+                                            TargetDisplay = targetDisplay,
+                                            IconPath = iconPath,
+                                            Position = position
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
+            return list;
+        }
+
+        public static void AddCustomGroup(string name, string targetType, string iconPath, string position)
+        {
+            string rootPath = GetRegistryPath(targetType);
+            string cleanGroupName = Regex.Replace(name, @"\W+", "");
+            string groupKeyName = $"CustomGroup_{cleanGroupName}";
+            string groupPath = $@"{rootPath}\{groupKeyName}";
+
+            using (var gkey = Registry.CurrentUser.CreateSubKey(groupPath))
+            {
+                gkey.SetValue("MUIVerb", name);
+                gkey.SetValue("SubCommands", "");
+
+                if (!string.IsNullOrEmpty(iconPath))
+                {
+                    gkey.SetValue("Icon", iconPath);
+                }
+                else
+                {
+                    gkey.SetValue("Icon", "shell32.dll,3"); // default yellow folder icon
+                }
+
+                if (position == "Top" || position == "Bottom")
+                {
+                    gkey.SetValue("Position", position);
+                }
+                else
+                {
+                    try { gkey.DeleteValue("Position"); } catch { }
+                }
+            }
+        }
+
+        public static void DeleteCustomGroup(string compoundId)
+        {
+            var index = compoundId.IndexOf('|');
+            if (index == -1) return;
+
+            string targetType = compoundId.Substring(0, index);
+            string keyId = compoundId.Substring(index + 1);
+            string rootPath = GetRegistryPath(targetType);
+
+            string fullPath = $@"{rootPath}\{keyId}";
+            Registry.CurrentUser.DeleteSubKeyTree(fullPath, false);
         }
     }
 }

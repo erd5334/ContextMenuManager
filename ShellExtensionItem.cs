@@ -7,5 +7,6 @@ namespace ContextMenuManager
         public string RegistryPath { get; set; } = string.Empty;
         public string TargetDisplay { get; set; } = string.Empty; // "Tüm Dosyalar", "Klasör", "Boş Alan"
         public bool IsBlocked { get; set; }
+        public bool IsStatic { get; set; }
     }
 }

@@ -73,13 +73,8 @@ namespace ContextMenuManager
                 var shortcuts = RegistryService.LoadShortcuts();
                 ShortcutsGrid.ItemsSource = shortcuts;
 
-                // Load groups and bind to ComboBox
+                // Load groups
                 var groups = RegistryService.GetExistingGroups();
-                
-                var comboGroups = new List<string>(groups);
-                GroupCombo.ItemsSource = comboGroups;
-                GroupCombo.Text = "Ana Menü";
-
                 var lockableGroups = new List<string>(groups);
                 lockableGroups.Remove("Ana Menü");
                 LockGroupCombo.ItemsSource = lockableGroups;
@@ -87,6 +82,10 @@ namespace ContextMenuManager
                 {
                     LockGroupCombo.SelectedIndex = 0;
                 }
+
+                // Load custom groups and bind to CategoriesGrid
+                var customGroups = RegistryService.LoadCustomGroups();
+                CategoriesGrid.ItemsSource = customGroups;
 
                 // Load locked groups
                 var lockedGroups = LockSettings.Load();
@@ -99,6 +98,9 @@ namespace ContextMenuManager
                 // Set initial status of checkboxes
                 ClassicMenuChk.IsChecked = RegistryService.CheckClassicMenuStatus();
                 PowerShellChk.IsChecked = RegistryService.CheckPowerShellStatus();
+
+                // Dynamic GroupCombo update
+                UpdateGroupComboForTarget();
             }
             catch (Exception ex)
             {
@@ -595,6 +597,8 @@ namespace ContextMenuManager
             {
                 ExtensionPanel.Visibility = Visibility.Collapsed;
             }
+
+            UpdateGroupComboForTarget();
         }
 
         private void ToggleBlockedBtn_Click(object sender, RoutedEventArgs e)
@@ -609,7 +613,7 @@ namespace ContextMenuManager
             try
             {
                 bool newBlockedState = !selectedItem.IsBlocked;
-                RegistryService.ToggleShellExtension(selectedItem.Clsid, newBlockedState);
+                RegistryService.ToggleShellExtension(selectedItem.Clsid, newBlockedState, selectedItem.IsStatic, selectedItem.RegistryPath);
 
                 string actionText = newBlockedState ? "devre dışı bırakıldı" : "etkinleştirildi";
                 
@@ -718,6 +722,156 @@ namespace ContextMenuManager
                     MessageBox.Show($"Kilidi kaldırırken bir hata oluştu:\n{ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
+        }
+
+        private void ExtensionTxt_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            UpdateGroupComboForTarget();
+        }
+
+        private void UpdateGroupComboForTarget()
+        {
+            if (_isInitializing || GroupCombo == null || TargetCombo == null) return;
+
+            string targetType;
+            if (TargetCombo.SelectedIndex == 3) // Belirli Dosya Uzantısı
+            {
+                targetType = $"FileExtension:{NormalizeExtension(ExtensionTxt.Text.Trim())}";
+            }
+            else
+            {
+                targetType = TargetCombo.SelectedIndex switch
+                {
+                    0 => "Background",
+                    1 => "Directory",
+                    2 => "AllFiles",
+                    _ => "Background"
+                };
+            }
+
+            var customGroups = RegistryService.LoadCustomGroups();
+            var filteredGroups = new List<string> { "Ana Menü" };
+            foreach (var g in customGroups)
+            {
+                if (string.Equals(g.TargetType, targetType, StringComparison.OrdinalIgnoreCase))
+                {
+                    filteredGroups.Add(g.Name);
+                }
+            }
+
+            GroupCombo.ItemsSource = filteredGroups;
+            GroupCombo.Text = "Ana Menü";
+        }
+
+        private void GroupTargetCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isInitializing || GroupExtensionPanel == null) return;
+
+            if (GroupTargetCombo.SelectedIndex == 3) // Belirli Dosya Uzantısı
+            {
+                GroupExtensionPanel.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                GroupExtensionPanel.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        private void GroupIconBrowseBtn_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var dialog = new IconPickerDialog
+                {
+                    Owner = this
+                };
+                if (dialog.ShowDialog() == true)
+                {
+                    GroupIconTxt.Text = dialog.SelectedIconResult;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"İkon seçici açılırken hata oluştu:\n{ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void AddGroupBtn_Click(object sender, RoutedEventArgs e)
+        {
+            string name = GroupNameTxt.Text.Trim();
+            string iconPath = GroupIconTxt.Text.Trim();
+            
+            string targetType = GroupTargetCombo.SelectedIndex switch
+            {
+                0 => "Background",
+                1 => "Directory",
+                2 => "AllFiles",
+                3 => $"FileExtension:{NormalizeExtension(GroupExtensionTxt.Text.Trim())}",
+                _ => "Background"
+            };
+
+            string position = GroupPositionCombo.SelectedIndex switch
+            {
+                0 => "Default",
+                1 => "Top",
+                2 => "Bottom",
+                _ => "Default"
+            };
+
+            if (string.IsNullOrEmpty(name))
+            {
+                MessageBox.Show("Lütfen kategori (alt menü) adını doldurun.", "Eksik Bilgi", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            try
+            {
+                RegistryService.AddCustomGroup(name, targetType, iconPath, position);
+                MessageBox.Show($"'{name}' kategorisi başarıyla oluşturuldu.", "Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
+                
+                GroupNameTxt.Text = string.Empty;
+                GroupIconTxt.Text = string.Empty;
+                RefreshAll();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Kategori oluşturulurken bir hata oluştu:\n{ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void DeleteGroupBtn_Click(object sender, RoutedEventArgs e)
+        {
+            var selectedItem = CategoriesGrid.SelectedItem as CustomGroupItem;
+            if (selectedItem == null)
+            {
+                MessageBox.Show("Lütfen silmek istediğiniz kategoriyi listeden seçin.", "Seçim Yok", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            var confirm = MessageBox.Show(
+                $"'{selectedItem.Name}' kategorisini silmek istediğinize emin misiniz?\n\n" +
+                "UYARI: Bu kategoriyi sildiğinizde, içerisindeki tüm kısayollar da kalıcı olarak silinecektir!",
+                "Kategoriyi Sil", 
+                MessageBoxButton.YesNo, 
+                MessageBoxImage.Warning);
+            
+            if (confirm != MessageBoxResult.Yes) return;
+
+            try
+            {
+                RegistryService.DeleteCustomGroup(selectedItem.Id);
+                MessageBox.Show("Kategori başarıyla kaldırıldı.", "Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
+                RefreshAll();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Kategori silinirken bir hata oluştu:\n{ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void RefreshGroupsBtn_Click(object sender, RoutedEventArgs e)
+        {
+            RefreshAll();
         }
     }
 }
