@@ -732,10 +732,10 @@ namespace ContextMenuManager
 
         private void UpdateGroupComboForTarget()
         {
-            if (_isInitializing || GroupCombo == null || TargetCombo == null) return;
+            if (GroupCombo == null || TargetCombo == null) return;
 
             string targetType;
-            if (TargetCombo.SelectedIndex == 3) // Belirli Dosya Uzantısı
+            if (TargetCombo.SelectedIndex == 3 && ExtensionTxt != null) // Belirli Dosya Uzantısı
             {
                 targetType = $"FileExtension:{NormalizeExtension(ExtensionTxt.Text.Trim())}";
             }
