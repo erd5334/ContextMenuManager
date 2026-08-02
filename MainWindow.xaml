@@ -409,6 +409,86 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
+
+        <!-- Modern PasswordBox Style -->
+        <Style TargetType="PasswordBox">
+            <Setter Property="Background" Value="{DynamicResource InputBgBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource InputTextBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="PasswordBox">
+                        <Border x:Name="border" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}" CornerRadius="6" SnapsToDevicePixels="True">
+                            <ScrollViewer x:Name="PART_ContentHost" Focusable="false" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="true">
+                                <Setter Property="BorderBrush" TargetName="border" Value="#94A3B8"/>
+                            </Trigger>
+                            <Trigger Property="IsFocused" Value="true">
+                                <Setter Property="BorderBrush" TargetName="border" Value="#64748B"/>
+                                <Setter Property="BorderThickness" TargetName="border" Value="1"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Modern ListView Style -->
+        <Style TargetType="ListView">
+            <Setter Property="Background" Value="{DynamicResource CardBgBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontSize" Value="13"/>
+        </Style>
+
+        <Style TargetType="ListViewItem">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}"/>
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListViewItem">
+                        <Border x:Name="itemBorder" Background="{TemplateBinding Background}" SnapsToDevicePixels="true">
+                            <GridViewRowPresenter VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="true">
+                                <Setter Property="Background" TargetName="itemBorder" Value="{DynamicResource WindowBgBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="true">
+                                <Setter Property="Background" TargetName="itemBorder" Value="#E2E8F0"/>
+                                <Setter Property="Foreground" Value="#0F172A"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- GridViewColumnHeader Style -->
+        <Style TargetType="GridViewColumnHeader">
+            <Setter Property="Background" Value="{DynamicResource WindowBgBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource LabelTextBrush}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="GridViewColumnHeader">
+                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <Grid Margin="24">
@@ -449,7 +529,7 @@
                     
                     <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,4,0">
                         <StackPanel>
-                            <TextBlock x:Name="FormTitleLabel" Text="Yeni Kısayol Ekle" FontSize="16" FontWeight="Bold" Foreground="#0F172A" Margin="0,0,0,16"/>
+                            <TextBlock x:Name="FormTitleLabel" Text="Yeni Kısayol Ekle" FontSize="16" FontWeight="Bold" Style="{StaticResource LabelStyle}" Margin="0,0,0,16"/>
                             
                             <!-- Shortcut Type -->
                             <TextBlock Text="Kısayol Türü" Style="{StaticResource LabelStyle}"/>
@@ -701,15 +781,15 @@
                                 </Grid.RowDefinitions>
 
                                 <!-- Panel: Lock an existing group -->
-                                <Border Grid.Row="0" Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="6" Padding="16" Margin="0,0,0,16">
+                                <Border Grid.Row="0" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="16" Margin="0,0,0,16">
                                     <Grid>
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto"/>
                                             <RowDefinition Height="Auto"/>
                                             <RowDefinition Height="Auto"/>
                                         </Grid.RowDefinitions>
-                                        
-                                        <TextBlock Grid.Row="0" Text="Mevcut Bir Grubu Şifreyle Kilitle" FontSize="15" FontWeight="Bold" Foreground="#334155" Margin="0,0,0,12"/>
+
+                                        <TextBlock Grid.Row="0" Text="Mevcut Bir Grubu Şifreyle Kilitle" FontSize="15" FontWeight="Bold" Style="{StaticResource LabelStyle}" Margin="0,0,0,12"/>
                                         
                                         <Grid Grid.Row="1">
                                             <Grid.ColumnDefinitions>
@@ -720,19 +800,19 @@
                                             
                                             <!-- Select Group -->
                                             <StackPanel Grid.Column="0" Margin="0,0,12,0">
-                                                <TextBlock Text="Kilitlenecek Alt Menü (Grup)" FontSize="12" FontWeight="SemiBold" Foreground="#64748B" Margin="0,0,0,4"/>
+                                                <TextBlock Text="Kilitlenecek Alt Menü (Grup)" FontSize="12" FontWeight="SemiBold" Style="{StaticResource LabelStyle}" Margin="0,0,0,4"/>
                                                 <ComboBox x:Name="LockGroupCombo" Height="36" VerticalContentAlignment="Center"/>
                                             </StackPanel>
                                             
                                             <!-- Password -->
                                             <StackPanel Grid.Column="1" Margin="0,0,12,0">
-                                                <TextBlock Text="Erişim Şifresi" FontSize="12" FontWeight="SemiBold" Foreground="#64748B" Margin="0,0,0,4"/>
+                                                <TextBlock Text="Erişim Şifresi" FontSize="12" FontWeight="SemiBold" Style="{StaticResource LabelStyle}" Margin="0,0,0,4"/>
                                                 <PasswordBox x:Name="LockPasswordTxt" Height="36" VerticalContentAlignment="Center"/>
                                             </StackPanel>
                                             
                                             <!-- Timeout -->
                                             <StackPanel Grid.Column="2">
-                                                <TextBlock Text="Açık Kalma Süresi (Saniye)" FontSize="12" FontWeight="SemiBold" Foreground="#64748B" Margin="0,0,0,4"/>
+                                                <TextBlock Text="Açık Kalma Süresi (Saniye)" FontSize="12" FontWeight="SemiBold" Style="{StaticResource LabelStyle}" Margin="0,0,0,4"/>
                                                 <TextBox x:Name="LockDurationTxt" Text="90" Height="36" VerticalContentAlignment="Center" HorizontalContentAlignment="Center"/>
                                             </StackPanel>
                                         </Grid>
@@ -749,7 +829,7 @@
                                         <RowDefinition Height="Auto"/>
                                     </Grid.RowDefinitions>
                                     
-                                    <TextBlock Grid.Row="0" Text="Şu Anda Şifreli (Kilitli) Gruplar" FontSize="15" FontWeight="Bold" Foreground="#334155" Margin="0,0,0,8"/>
+                                    <TextBlock Grid.Row="0" Text="Şu Anda Şifreli (Kilitli) Gruplar" FontSize="15" FontWeight="Bold" Style="{StaticResource LabelStyle}" Margin="0,0,0,8"/>
                                     
                                     <!-- List of locked groups -->
                                     <ListView x:Name="LockedGroupsList" Grid.Row="1" BorderBrush="#E2E8F0" BorderThickness="1" Margin="0,0,0,12">
@@ -776,9 +856,9 @@
                                 </Grid.ColumnDefinitions>
 
                                 <!-- Left side: Add Submenu Form -->
-                                <Border Grid.Column="0" Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="6" Padding="16" Margin="0,0,16,0">
+                                <Border Grid.Column="0" Background="{DynamicResource CardBgBrush}"  BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="16" Margin="0,0,16,0">
                                     <StackPanel>
-                                        <TextBlock Text="Yeni Kategori Oluştur" FontSize="15" FontWeight="Bold" Foreground="#334155" Margin="0,0,0,12"/>
+                                        <TextBlock Text="Yeni Kategori Oluştur" FontSize="15" FontWeight="Bold" Style="{StaticResource LabelStyle}" Margin="0,0,0,12"/>
 
                                         <!-- Submenu Name -->
                                         <TextBlock Text="Kategori (Alt Menü) Adı" Style="{StaticResource LabelStyle}"/>
