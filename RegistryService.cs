@@ -322,13 +322,9 @@ namespace ContextMenuManager
                 {
                     gkey.SetValue("MUIVerb", group);
                     gkey.SetValue("SubCommands", "");
-                    // Grup simgesini sadece formda yeni bir simge seçildiyse güncelleriz, 
-                    // aksi halde grubun mevcut simgesini bozmayıp koruruz (yeni grup ise varsayılan sarı klasör simgesi verilir).
-                    if (!string.IsNullOrEmpty(customIconPath))
-                    {
-                        gkey.SetValue("Icon", customIconPath);
-                    }
-                    else if (gkey.GetValue("Icon") == null)
+                    // Eger grup yeni olusturulmussa ve simgesi yoksa varsayilan klasor simgesi verilir.
+                    // Aksi takdirde Kategoriler sekmesinde secilen simge korunur.
+                    if (gkey.GetValue("Icon") == null)
                     {
                         gkey.SetValue("Icon", "shell32.dll,3"); // varsayılan klasör simgesi
                     }
@@ -344,16 +340,23 @@ namespace ContextMenuManager
                 {
                     key.SetValue("", name);
 
-                    // Inside a group, the item always gets its own default icon, NOT the group's custom icon path!
+                    // Kısayolun kendi özel simgesi varsa o kullanılır, yoksa varsayılan dosya/klasör simgesi verilir.
                     string itemIcon;
-                    if (isRaw)
+                    if (!string.IsNullOrEmpty(customIconPath))
                     {
-                        string exePath = ExtractExecutableFromCommand(path);
-                        itemIcon = File.Exists(exePath) ? exePath : (isFolder ? "shell32.dll,3" : "cmd.exe");
+                        itemIcon = customIconPath;
                     }
                     else
                     {
-                        itemIcon = isFolder ? "explorer.exe" : absolutePath;
+                        if (isRaw)
+                        {
+                            string exePath = ExtractExecutableFromCommand(path);
+                            itemIcon = File.Exists(exePath) ? exePath : (isFolder ? "shell32.dll,3" : "cmd.exe");
+                        }
+                        else
+                        {
+                            itemIcon = isFolder ? "explorer.exe" : absolutePath;
+                        }
                     }
                     key.SetValue("Icon", itemIcon);
 
@@ -718,23 +721,6 @@ namespace ContextMenuManager
 
                     string itemPath = $@"{rootPath}\{groupKey}\shell\{itemKey}";
                     Registry.CurrentUser.DeleteSubKeyTree(itemPath, false);
-
-                    // Clean up group if empty
-                    string groupShellPath = $@"{rootPath}\{groupKey}\shell";
-                    bool hasItems = false;
-                    using (var gshell = Registry.CurrentUser.OpenSubKey(groupShellPath))
-                    {
-                        if (gshell != null && gshell.SubKeyCount > 0)
-                        {
-                            hasItems = true;
-                        }
-                    }
-
-                    if (!hasItems)
-                    {
-                        Registry.CurrentUser.DeleteSubKeyTree(groupShellPath, false);
-                        Registry.CurrentUser.DeleteSubKeyTree($@"{rootPath}\{groupKey}", false);
-                    }
                 }
             }
             else
@@ -1289,6 +1275,80 @@ namespace ContextMenuManager
 
             string fullPath = $@"{rootPath}\{keyId}";
             Registry.CurrentUser.DeleteSubKeyTree(fullPath, false);
+        }
+
+        public static void EditCustomGroup(string oldCompoundId, string newName, string newTargetType, string newIconPath, string newPosition)
+        {
+            var index = oldCompoundId.IndexOf('|');
+            if (index == -1) return;
+
+            string oldTargetType = oldCompoundId.Substring(0, index);
+            string oldKeyId = oldCompoundId.Substring(index + 1);
+            string oldRootPath = GetRegistryPath(oldTargetType);
+            string oldGroupPath = $@"{oldRootPath}\{oldKeyId}";
+
+            string newRootPath = GetRegistryPath(newTargetType);
+            string newGroupPath = $@"{newRootPath}\{oldKeyId}";
+
+            // Target type değiştiyse tüm alt anahtarlarıyla kopyala ve eskiyi sil
+            if (!string.Equals(oldTargetType, newTargetType, StringComparison.OrdinalIgnoreCase))
+            {
+                CopyRegistryKey(Registry.CurrentUser, oldGroupPath, Registry.CurrentUser, newGroupPath);
+                Registry.CurrentUser.DeleteSubKeyTree(oldGroupPath, false);
+            }
+
+            // Değerleri güncelle
+            using (var key = Registry.CurrentUser.CreateSubKey(newGroupPath))
+            {
+                if (key != null)
+                {
+                    key.SetValue("MUIVerb", newName);
+                    
+                    if (!string.IsNullOrEmpty(newIconPath))
+                    {
+                        key.SetValue("Icon", newIconPath);
+                    }
+                    else
+                    {
+                        try { key.DeleteValue("Icon", false); } catch { }
+                    }
+
+                    if (newPosition == "Top" || newPosition == "Bottom")
+                    {
+                        key.SetValue("Position", newPosition);
+                    }
+                    else
+                    {
+                        try { key.DeleteValue("Position", false); } catch { }
+                    }
+                }
+            }
+        }
+
+        private static void CopyRegistryKey(RegistryKey srcParent, string srcSubKey, RegistryKey destParent, string destSubKey)
+        {
+            using (var srcKey = srcParent.OpenSubKey(srcSubKey))
+            {
+                if (srcKey == null) return;
+                using (var destKey = destParent.CreateSubKey(destSubKey))
+                {
+                    if (destKey == null) return;
+
+                    foreach (var valName in srcKey.GetValueNames())
+                    {
+                        var val = srcKey.GetValue(valName);
+                        if (val != null)
+                        {
+                            destKey.SetValue(valName, val, srcKey.GetValueKind(valName));
+                        }
+                    }
+
+                    foreach (var subKeyName in srcKey.GetSubKeyNames())
+                    {
+                        CopyRegistryKey(srcKey, subKeyName, destKey, subKeyName);
+                    }
+                }
+            }
         }
 
         public static bool LoadThemeSetting()

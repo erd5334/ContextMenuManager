@@ -576,7 +576,7 @@
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <TextBox x:Name="PathTxt" Grid.Column="0" Height="36" VerticalContentAlignment="Center" Margin="0,0,8,0"/>
+                                <TextBox x:Name="PathTxt" Grid.Column="0" Height="36" VerticalContentAlignment="Center" Margin="0,0,8,0" TextChanged="PathTxt_TextChanged"/>
                                 <Button x:Name="BrowseBtn" Grid.Column="1" Content="Gözat..." Width="80" Style="{StaticResource SecondaryButtonStyle}" Click="BrowseBtn_Click"/>
                             </Grid>
                             
@@ -858,7 +858,7 @@
                                 <!-- Left side: Add Submenu Form -->
                                 <Border Grid.Column="0" Background="{DynamicResource CardBgBrush}"  BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="16" Margin="0,0,16,0">
                                     <StackPanel>
-                                        <TextBlock Text="Yeni Kategori Oluştur" FontSize="15" FontWeight="Bold" Style="{StaticResource LabelStyle}" Margin="0,0,0,12"/>
+                                        <TextBlock x:Name="GroupFormTitleLabel" Text="Yeni Kategori Oluştur" FontSize="15" FontWeight="Bold" Style="{StaticResource LabelStyle}" Margin="0,0,0,12"/>
 
                                         <!-- Submenu Name -->
                                         <TextBlock Text="Kategori (Alt Menü) Adı" Style="{StaticResource LabelStyle}"/>
@@ -898,7 +898,18 @@
                                             <Button x:Name="GroupIconBrowseBtn" Grid.Column="1" Content="Seç..." Width="60" Style="{StaticResource SecondaryButtonStyle}" Click="GroupIconBrowseBtn_Click"/>
                                         </Grid>
 
-                                        <Button x:Name="AddGroupBtn" Content="Kategori Oluştur" Height="40" Style="{StaticResource PrimaryButtonStyle}" Click="AddGroupBtn_Click"/>
+                                        <Grid>
+                                            <Button x:Name="AddGroupBtn" Content="Kategori Oluştur" Height="40" Style="{StaticResource PrimaryButtonStyle}" Click="AddGroupBtn_Click"/>
+                                            
+                                            <Grid x:Name="EditGroupBtnGrid" Visibility="Collapsed">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Button x:Name="SaveEditGroupBtn" Grid.Column="0" Content="Değişiklikleri Kaydet" Height="40" Margin="0,0,6,0" Style="{StaticResource PrimaryButtonStyle}" Click="SaveEditGroupBtn_Click"/>
+                                                <Button x:Name="CancelEditGroupBtn" Grid.Column="1" Content="Vazgeç" Height="40" Margin="6,0,0,0" Style="{StaticResource SecondaryButtonStyle}" Click="CancelEditGroupBtn_Click"/>
+                                            </Grid>
+                                        </Grid>
                                     </StackPanel>
                                 </Border>
 
@@ -909,7 +920,7 @@
                                         <RowDefinition Height="Auto"/>
                                     </Grid.RowDefinitions>
 
-                                    <DataGrid x:Name="CategoriesGrid" Grid.Row="0" AutoGenerateColumns="False">
+                                    <DataGrid x:Name="CategoriesGrid" Grid.Row="0" AutoGenerateColumns="False" MouseDoubleClick="CategoriesGrid_MouseDoubleClick">
                                         <DataGrid.Columns>
                                             <DataGridTextColumn Header="Kategori Adı" Binding="{Binding Name}" Width="150"/>
                                             <DataGridTextColumn Header="Hedef Alan" Binding="{Binding TargetDisplay}" Width="120"/>
@@ -920,6 +931,7 @@
 
                                     <Grid Grid.Row="1" Margin="0,16,0,0">
                                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                                            <Button x:Name="EditGroupBtn" Content="Seçileni Düzenle" Width="150" Height="38" Margin="0,0,10,0" Style="{StaticResource SecondaryButtonStyle}" Click="EditGroupBtn_Click"/>
                                             <Button x:Name="DeleteGroupBtn" Content="Seçilen Kategoriyi Sil" Width="180" Height="38" Style="{StaticResource DangerButtonStyle}" Click="DeleteGroupBtn_Click"/>
                                         </StackPanel>
                                         <Button x:Name="RefreshGroupsBtn" HorizontalAlignment="Right" Content="Listeyi Yenile" Width="130" Height="38" Style="{StaticResource SecondaryButtonStyle}" Click="RefreshGroupsBtn_Click"/>

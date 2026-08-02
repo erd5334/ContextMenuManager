@@ -10,6 +10,7 @@ namespace ContextMenuManager
     {
         private bool _isInitializing = true;
         private ShortcutItem? _editingItem = null;
+        private CustomGroupItem? _editingGroup = null;
 
         public MainWindow()
         {
@@ -843,6 +844,128 @@ namespace ContextMenuManager
             }
         }
 
+        private void EditGroupSelected()
+        {
+            var selectedItem = CategoriesGrid.SelectedItem as CustomGroupItem;
+            if (selectedItem == null) return;
+
+            _editingGroup = selectedItem;
+
+            GroupNameTxt.Text = selectedItem.Name;
+            GroupIconTxt.Text = selectedItem.IconPath;
+
+            // Target type selection
+            if (selectedItem.TargetType.StartsWith("FileExtension:"))
+            {
+                GroupTargetCombo.SelectedIndex = 3;
+                string ext = selectedItem.TargetType.Substring("FileExtension:".Length);
+                GroupExtensionTxt.Text = ext;
+                if (GroupExtensionPanel != null) GroupExtensionPanel.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                GroupTargetCombo.SelectedIndex = selectedItem.TargetType switch
+                {
+                    "Background" => 0,
+                    "Directory" => 1,
+                    "AllFiles" => 2,
+                    _ => 0
+                };
+                if (GroupExtensionPanel != null) GroupExtensionPanel.Visibility = Visibility.Collapsed;
+            }
+
+            // Position selection
+            GroupPositionCombo.SelectedIndex = selectedItem.Position switch
+            {
+                "Default" => 0,
+                "Top" => 1,
+                "Bottom" => 2,
+                _ => 0
+            };
+
+            GroupFormTitleLabel.Text = "Kategoriyi Düzenle";
+            AddGroupBtn.Visibility = Visibility.Collapsed;
+            EditGroupBtnGrid.Visibility = Visibility.Visible;
+        }
+
+        private void CancelEditGroup()
+        {
+            _editingGroup = null;
+            GroupNameTxt.Text = string.Empty;
+            GroupIconTxt.Text = string.Empty;
+            GroupTargetCombo.SelectedIndex = 0;
+            GroupPositionCombo.SelectedIndex = 0;
+            GroupExtensionTxt.Text = ".txt";
+            if (GroupExtensionPanel != null) GroupExtensionPanel.Visibility = Visibility.Collapsed;
+
+            GroupFormTitleLabel.Text = "Yeni Kategori Oluştur";
+            AddGroupBtn.Visibility = Visibility.Visible;
+            EditGroupBtnGrid.Visibility = Visibility.Collapsed;
+        }
+
+        private void CategoriesGrid_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            EditGroupSelected();
+        }
+
+        private void EditGroupBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (CategoriesGrid.SelectedItem == null)
+            {
+                MessageBox.Show("Lütfen düzenlemek istediğiniz kategoriyi listeden seçin.", "Seçim Yok", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            EditGroupSelected();
+        }
+
+        private void CancelEditGroupBtn_Click(object sender, RoutedEventArgs e)
+        {
+            CancelEditGroup();
+        }
+
+        private void SaveEditGroupBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (_editingGroup == null) return;
+
+            string name = GroupNameTxt.Text.Trim();
+            string iconPath = GroupIconTxt.Text.Trim();
+            
+            string targetType = GroupTargetCombo.SelectedIndex switch
+            {
+                0 => "Background",
+                1 => "Directory",
+                2 => "AllFiles",
+                3 => $"FileExtension:{NormalizeExtension(GroupExtensionTxt.Text.Trim())}",
+                _ => "Background"
+            };
+
+            string position = GroupPositionCombo.SelectedIndex switch
+            {
+                0 => "Default",
+                1 => "Top",
+                2 => "Bottom",
+                _ => "Default"
+            };
+
+            if (string.IsNullOrEmpty(name))
+            {
+                MessageBox.Show("Lütfen kategori (alt menü) adını doldurun.", "Eksik Bilgi", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            try
+            {
+                RegistryService.EditCustomGroup(_editingGroup.Id, name, targetType, iconPath, position);
+                MessageBox.Show($"'{name}' kategorisi başarıyla güncellendi.", "Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
+                CancelEditGroup();
+                RefreshAll();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Kategori güncellenirken bir hata oluştu:\n{ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
         private void DeleteGroupBtn_Click(object sender, RoutedEventArgs e)
         {
             var selectedItem = CategoriesGrid.SelectedItem as CustomGroupItem;
@@ -1019,6 +1142,12 @@ namespace ContextMenuManager
             {
                 MessageBox.Show($"Şablon eklenirken hata oluştu:\n{ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+        }
+
+        private void PathTxt_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(PathTxt.Text)) return;
+            PathTxt.Text = PathTxt.Text.Replace("\"", "");
         }
     }
 }
