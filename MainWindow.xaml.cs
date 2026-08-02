@@ -184,7 +184,7 @@ namespace ContextMenuManager
         {
             string name = NameTxt.Text.Trim();
             string path = PathTxt.Text.Trim();
-            string group = GroupCombo.Text.Trim();
+            string group = (GroupCombo.SelectedItem as string ?? "Ana Menü").Trim();
             bool isFolder = TypeCombo.SelectedIndex == 0;
             string customIconPath = IconTxt.Text.Trim();
 
@@ -263,7 +263,7 @@ namespace ContextMenuManager
             // Populate fields
             NameTxt.Text = selectedItem.Name;
             PathTxt.Text = selectedItem.Path;
-            GroupCombo.Text = string.IsNullOrEmpty(selectedItem.Group) ? "Ana Menü" : selectedItem.Group;
+            GroupCombo.SelectedItem = string.IsNullOrEmpty(selectedItem.Group) ? "Ana Menü" : selectedItem.Group;
             IconTxt.Text = selectedItem.IconPath;
 
             // Type
@@ -310,7 +310,7 @@ namespace ContextMenuManager
             NameTxt.Text = string.Empty;
             PathTxt.Text = string.Empty;
             IconTxt.Text = string.Empty;
-            GroupCombo.Text = "Ana Menü";
+            GroupCombo.SelectedItem = "Ana Menü";
             TypeCombo.SelectedIndex = 0;
             TargetCombo.SelectedIndex = 0;
             PositionCombo.SelectedIndex = 0;
@@ -349,7 +349,7 @@ namespace ContextMenuManager
 
             string name = NameTxt.Text.Trim();
             string path = PathTxt.Text.Trim();
-            string group = GroupCombo.Text.Trim();
+            string group = (GroupCombo.SelectedItem as string ?? "Ana Menü").Trim();
             bool isFolder = TypeCombo.SelectedIndex == 0;
             string customIconPath = IconTxt.Text.Trim();
 
@@ -761,7 +761,10 @@ namespace ContextMenuManager
             }
 
             GroupCombo.ItemsSource = filteredGroups;
-            GroupCombo.Text = "Ana Menü";
+            if (filteredGroups.Count > 0)
+            {
+                GroupCombo.SelectedIndex = 0;
+            }
         }
 
         private void GroupTargetCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
