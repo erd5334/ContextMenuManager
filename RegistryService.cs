@@ -1290,5 +1290,31 @@ namespace ContextMenuManager
             string fullPath = $@"{rootPath}\{keyId}";
             Registry.CurrentUser.DeleteSubKeyTree(fullPath, false);
         }
+
+        public static bool LoadThemeSetting()
+        {
+            string settingsPath = @"Software\ContextMenuManager\Settings";
+            using (var key = Registry.CurrentUser.OpenSubKey(settingsPath))
+            {
+                if (key != null)
+                {
+                    var val = key.GetValue("DarkMode");
+                    if (val != null && int.TryParse(val.ToString(), out int result))
+                    {
+                        return result == 1;
+                    }
+                }
+            }
+            return false; // light mode is default
+        }
+
+        public static void SaveThemeSetting(bool isDark)
+        {
+            string settingsPath = @"Software\ContextMenuManager\Settings";
+            using (var key = Registry.CurrentUser.CreateSubKey(settingsPath))
+            {
+                key.SetValue("DarkMode", isDark ? 1 : 0, RegistryValueKind.DWord);
+            }
+        }
     }
 }

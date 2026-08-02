@@ -60,6 +60,7 @@ namespace ContextMenuManager
 
             // Normal Startup: Check and lock all groups (self-healing)
             RegistryService.CheckAndLockAllGroups();
+            ToggleTheme(RegistryService.LoadThemeSetting());
             RefreshAll();
         }
 
@@ -872,6 +873,149 @@ namespace ContextMenuManager
         private void RefreshGroupsBtn_Click(object sender, RoutedEventArgs e)
         {
             RefreshAll();
+        }
+
+        private void Window_DragOver(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent(DataFormats.FileDrop))
+            {
+                e.Effects = DragDropEffects.Copy;
+            }
+            else
+            {
+                e.Effects = DragDropEffects.None;
+            }
+            e.Handled = true;
+        }
+
+        private void Window_Drop(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent(DataFormats.FileDrop))
+            {
+                string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
+                if (files != null && files.Length > 0)
+                {
+                    string path = files[0];
+                    PathTxt.Text = path;
+
+                    if (System.IO.Directory.Exists(path))
+                    {
+                        TypeCombo.SelectedIndex = 0; // Klasör
+                        NameTxt.Text = System.IO.Path.GetFileName(path);
+                        IconTxt.Text = "shell32.dll,3";
+                    }
+                    else if (System.IO.File.Exists(path))
+                    {
+                        TypeCombo.SelectedIndex = 1; // Dosya / Program
+                        NameTxt.Text = System.IO.Path.GetFileNameWithoutExtension(path);
+                        
+                        string ext = System.IO.Path.GetExtension(path).ToLower();
+                        if (ext == ".exe" || ext == ".ico")
+                        {
+                            IconTxt.Text = path;
+                        }
+                        else
+                        {
+                            IconTxt.Text = "shell32.dll,16";
+                        }
+                    }
+                    
+                    this.Activate();
+                    NameTxt.Focus();
+                }
+            }
+        }
+
+        private void ThemeToggleBtn_Click(object sender, RoutedEventArgs e)
+        {
+            bool nextDark = !_isDarkMode;
+            ToggleTheme(nextDark);
+            RegistryService.SaveThemeSetting(nextDark);
+        }
+
+        private bool _isDarkMode = false;
+
+        private void ToggleTheme(bool dark)
+        {
+            _isDarkMode = dark;
+
+            var windowBg = dark ? "#0F172A" : "#F8FAFC";
+            var cardBg = dark ? "#1E293B" : "#FFFFFF";
+            var borderBrush = dark ? "#334155" : "#E2E8F0";
+            var primaryText = dark ? "#F8FAFC" : "#0F172A";
+            var secondaryText = dark ? "#94A3B8" : "#64748B";
+            var labelText = dark ? "#CBD5E1" : "#475569";
+            var inputBg = dark ? "#0F172A" : "#FFFFFF";
+            var inputText = dark ? "#F8FAFC" : "#0F172A";
+            var btnPrimaryBg = dark ? "#475569" : "#334155";
+            var btnSecondaryText = dark ? "#CBD5E1" : "#334155";
+            var dgAlternating = dark ? "#1C2535" : "#F8FAFC";
+
+            UpdateResourceBrush("WindowBgBrush", windowBg);
+            UpdateResourceBrush("CardBgBrush", cardBg);
+            UpdateResourceBrush("BorderBrush", borderBrush);
+            UpdateResourceBrush("PrimaryTextBrush", primaryText);
+            UpdateResourceBrush("SecondaryTextBrush", secondaryText);
+            UpdateResourceBrush("LabelTextBrush", labelText);
+            UpdateResourceBrush("InputBgBrush", inputBg);
+            UpdateResourceBrush("InputTextBrush", inputText);
+            UpdateResourceBrush("BtnPrimaryBgBrush", btnPrimaryBg);
+            UpdateResourceBrush("BtnSecondaryTextBrush", btnSecondaryText);
+            UpdateResourceBrush("DataGridAlternatingBgBrush", dgAlternating);
+
+            if (ThemeToggleBtn != null)
+            {
+                ThemeToggleBtn.Content = dark ? "☀️ Açık Tema" : "🌙 Karanlık Tema";
+            }
+        }
+
+        private void UpdateResourceBrush(string resourceKey, string hexColor)
+        {
+            var brush = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(hexColor));
+            brush.Freeze();
+            this.Resources[resourceKey] = brush;
+        }
+
+        private void PresetToggleHidden_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                string cmdVal = @"powershell.exe -WindowStyle Hidden -Command ""$p='HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'; $v=Get-ItemProperty -Path $p; $newVal=if($v.Hidden -eq 1){2}else{1}; Set-ItemProperty -Path $p -Name Hidden -Value $newVal; Set-ItemProperty -Path $p -Name ShowSuperHidden -Value $newVal; stop-process -name explorer -force""";
+                RegistryService.AddRawShortcut(
+                    "Gizli Dosyaları Göster / Gizle", 
+                    cmdVal, 
+                    "imageres.dll,85", 
+                    "Background", 
+                    "Default"
+                );
+                MessageBox.Show("'Gizli Dosyaları Göster / Gizle' eylemi sağ tık menüsü boş alanına başarıyla eklendi.", "Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
+                RefreshAll();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Şablon eklenirken hata oluştu:\n{ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void PresetToggleExtensions_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                string cmdVal = @"powershell.exe -WindowStyle Hidden -Command ""$p='HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'; $v=Get-ItemProperty -Path $p; $newVal=if($v.HideFileExt -eq 1){0}else{1}; Set-ItemProperty -Path $p -Name HideFileExt -Value $newVal; stop-process -name explorer -force""";
+                RegistryService.AddRawShortcut(
+                    "Dosya Uzantılarını Göster / Gizle", 
+                    cmdVal, 
+                    "shell32.dll,22", 
+                    "Background", 
+                    "Default"
+                );
+                MessageBox.Show("'Dosya Uzantılarını Göster / Gizle' eylemi sağ tık menüsü boş alanına başarıyla eklendi.", "Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
+                RefreshAll();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Şablon eklenirken hata oluştu:\n{ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
     }
 }
