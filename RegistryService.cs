@@ -1431,6 +1431,13 @@ namespace ContextMenuManager
         [DllImport("user32.dll")]
         private static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
 
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetDlgItem(IntPtr hDlg, int nIDDlgItem);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool IsWindowVisible(IntPtr hWnd);
+
         private const uint WM_SETTEXT = 0x000C;
         private const uint WM_KEYDOWN = 0x0100;
         private const int VK_RETURN = 0x0D;
@@ -1462,21 +1469,8 @@ namespace ContextMenuManager
                 return false;
             }
 
-            // Find Edit control recursively: FileDialog has ComboBoxEx32 -> ComboBox -> Edit
-            IntPtr editHwnd = FindWindowEx(hwnd, IntPtr.Zero, "ComboBoxEx32", null);
-            if (editHwnd != IntPtr.Zero)
-            {
-                editHwnd = FindWindowEx(editHwnd, IntPtr.Zero, "ComboBox", null);
-                if (editHwnd != IntPtr.Zero)
-                {
-                    editHwnd = FindWindowEx(editHwnd, IntPtr.Zero, "Edit", null);
-                }
-            }
-            if (editHwnd == IntPtr.Zero)
-            {
-                // Fallback to searching direct child Edit controls
-                editHwnd = FindWindowEx(hwnd, IntPtr.Zero, "Edit", null);
-            }
+            // Find the active filename Edit control robustly
+            IntPtr editHwnd = FindEditControl(hwnd);
 
             if (editHwnd != IntPtr.Zero)
             {
@@ -1487,6 +1481,49 @@ namespace ContextMenuManager
             }
 
             return false;
+        }
+
+        private static IntPtr FindEditControl(IntPtr parent)
+        {
+            // 1. Try GetDlgItem with standard filename Edit control ID (1152 / 0x480)
+            IntPtr ctrl = GetDlgItem(parent, 1152);
+            if (ctrl != IntPtr.Zero) return ctrl;
+
+            // 2. Try GetDlgItem with alternate combobox/edit ID (1001)
+            ctrl = GetDlgItem(parent, 1001);
+            if (ctrl != IntPtr.Zero)
+            {
+                IntPtr childEdit = FindWindowEx(ctrl, IntPtr.Zero, "Edit", null);
+                if (childEdit != IntPtr.Zero) return childEdit;
+                return ctrl;
+            }
+
+            // 3. Fallback: recursively search for the first visible control of class "Edit"
+            return FindVisibleEditRecursive(parent);
+        }
+
+        private static IntPtr FindVisibleEditRecursive(IntPtr parent)
+        {
+            IntPtr child = IntPtr.Zero;
+            while (true)
+            {
+                child = FindWindowEx(parent, child, null, null);
+                if (child == IntPtr.Zero) break;
+
+                var className = new StringBuilder(256);
+                GetClassName(child, className, className.Capacity);
+                if (className.ToString().Equals("Edit", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (IsWindowVisible(child))
+                    {
+                        return child;
+                    }
+                }
+
+                IntPtr recurse = FindVisibleEditRecursive(child);
+                if (recurse != IntPtr.Zero) return recurse;
+            }
+            return IntPtr.Zero;
         }
     }
 }
