@@ -19,6 +19,22 @@ namespace ContextMenuManager
 
             // Command-line arguments processing
             string[] args = Environment.GetCommandLineArgs();
+            if (args.Length > 2 && args[1] == "--navigate-dialog")
+            {
+                string targetFolder = args[2];
+                bool navigated = RegistryService.NavigateActiveDialog(targetFolder);
+                if (!navigated)
+                {
+                    try
+                    {
+                        System.Diagnostics.Process.Start("explorer.exe", $"\"{targetFolder}\"");
+                    }
+                    catch { }
+                }
+                Application.Current.Shutdown();
+                return;
+            }
+
             if (args.Length > 2 && args[1] == "--unlock")
             {
                 string groupToUnlock = args[2];
@@ -100,6 +116,7 @@ namespace ContextMenuManager
                 // Set initial status of checkboxes
                 ClassicMenuChk.IsChecked = RegistryService.CheckClassicMenuStatus();
                 PowerShellChk.IsChecked = RegistryService.CheckPowerShellStatus();
+                CopyAsPathChk.IsChecked = RegistryService.CheckCopyAsPathStatus();
 
                 // Dynamic GroupCombo update
                 UpdateGroupComboForTarget();
@@ -497,6 +514,28 @@ namespace ContextMenuManager
             {
                 MessageBox.Show($"PowerShell ayarı değiştirilirken hata oluştu:\n{ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
                 PowerShellChk.IsChecked = !PowerShellChk.IsChecked;
+            }
+        }
+
+        private void CopyAsPathChk_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isInitializing) return;
+
+            try
+            {
+                bool enable = CopyAsPathChk.IsChecked == true;
+                RegistryService.ToggleCopyAsPath(enable);
+
+                string msg = enable 
+                    ? "Yol Olarak Kopyala seçeneği her zaman görünecek şekilde sabitlendi." 
+                    : "Yol Olarak Kopyala seçeneği varsayılana döndürüldü (sadece Shift tuşu ile görünecek).";
+
+                MessageBox.Show(msg, "Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Yol Olarak Kopyala ayarı değiştirilirken hata oluştu:\n{ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
+                CopyAsPathChk.IsChecked = !CopyAsPathChk.IsChecked;
             }
         }
 

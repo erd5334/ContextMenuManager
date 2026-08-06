@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.InteropServices;
+using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.Win32;
 
@@ -256,13 +258,14 @@ namespace ContextMenuManager
             }
             else
             {
+                string exePath = Environment.ProcessPath ?? "Sağ Tık Yöneticisi.exe";
                 if (targetType == "Background")
                 {
-                    cmdVal = isFolder ? $@"explorer.exe ""{absolutePath}""" : $@"""{absolutePath}""";
+                    cmdVal = isFolder ? $@"""{exePath}"" --navigate-dialog ""{absolutePath}""" : $@"""{absolutePath}""";
                 }
                 else // Directory or AllFiles
                 {
-                    cmdVal = isFolder ? $@"explorer.exe ""{absolutePath}""" : $@"""{absolutePath}"" ""%1""";
+                    cmdVal = isFolder ? $@"""{exePath}"" --navigate-dialog ""{absolutePath}""" : $@"""{absolutePath}"" ""%1""";
                 }
             }
 
@@ -792,6 +795,36 @@ namespace ContextMenuManager
             }
         }
 
+        public static bool CheckCopyAsPathStatus()
+        {
+            string path = @"Software\Classes\Allfilesystemobjects\shell\windows.copyaspath";
+            using (var key = Registry.CurrentUser.OpenSubKey(path))
+            {
+                return key != null;
+            }
+        }
+
+        public static void ToggleCopyAsPath(bool enable)
+        {
+            string path = @"Software\Classes\Allfilesystemobjects\shell\windows.copyaspath";
+            if (enable)
+            {
+                using (var key = Registry.CurrentUser.CreateSubKey(path))
+                {
+                    key.SetValue("", "Yol Olarak Kopyala");
+                    key.SetValue("Icon", "imageres.dll,-5302");
+                    key.SetValue("InvokeCommandOnSelection", 1, RegistryValueKind.DWord);
+                    key.SetValue("VerbHandler", "{f3d06e7c-1e45-4a26-847e-f9fcdee59be0}");
+                    key.SetValue("VerbName", "copyaspath");
+                }
+            }
+            else
+            {
+                Registry.CurrentUser.DeleteSubKeyTree(path, false);
+            }
+            RefreshExplorer();
+        }
+
         public static bool CheckClassicMenuStatus()
         {
             string inprocPath = $@"{CLASSIC_MENU_PATH}\InprocServer32";
@@ -820,7 +853,13 @@ namespace ContextMenuManager
         {
             if (string.IsNullOrEmpty(cmd)) return string.Empty;
 
-            var match = Regex.Match(cmd, @"explorer\.exe\s+""([^""]+)""");
+            var match = Regex.Match(cmd, @"--navigate-dialog\s+""([^""]+)""");
+            if (match.Success) return match.Groups[1].Value;
+
+            match = Regex.Match(cmd, @"--navigate-dialog\s+(.+)");
+            if (match.Success) return match.Groups[1].Value;
+
+            match = Regex.Match(cmd, @"explorer\.exe\s+""([^""]+)""");
             if (match.Success) return match.Groups[1].Value;
 
             match = Regex.Match(cmd, @"explorer\.exe\s+(.+)");
@@ -1375,6 +1414,79 @@ namespace ContextMenuManager
             {
                 key.SetValue("DarkMode", isDark ? 1 : 0, RegistryValueKind.DWord);
             }
+        }
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetForegroundWindow();
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        private static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
+
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        private static extern IntPtr FindWindowEx(IntPtr hwndParent, IntPtr hwndChildAfter, string? lpszClass, string? lpszWindow);
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        private static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, string? lParam);
+
+        [DllImport("user32.dll")]
+        private static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+
+        private const uint WM_SETTEXT = 0x000C;
+        private const uint WM_KEYDOWN = 0x0100;
+        private const int VK_RETURN = 0x0D;
+
+        public static bool NavigateActiveDialog(string targetFolder)
+        {
+            IntPtr hwnd = IntPtr.Zero;
+            for (int i = 0; i < 10; i++) // Retry up to 10 times (500ms total)
+            {
+                hwnd = GetForegroundWindow();
+                if (hwnd != IntPtr.Zero)
+                {
+                    var className = new StringBuilder(256);
+                    GetClassName(hwnd, className, className.Capacity);
+                    if (className.ToString() == "#32770")
+                    {
+                        break;
+                    }
+                }
+                System.Threading.Thread.Sleep(50);
+            }
+
+            if (hwnd == IntPtr.Zero) return false;
+
+            var finalClassName = new StringBuilder(256);
+            GetClassName(hwnd, finalClassName, finalClassName.Capacity);
+            if (finalClassName.ToString() != "#32770")
+            {
+                return false;
+            }
+
+            // Find Edit control recursively: FileDialog has ComboBoxEx32 -> ComboBox -> Edit
+            IntPtr editHwnd = FindWindowEx(hwnd, IntPtr.Zero, "ComboBoxEx32", null);
+            if (editHwnd != IntPtr.Zero)
+            {
+                editHwnd = FindWindowEx(editHwnd, IntPtr.Zero, "ComboBox", null);
+                if (editHwnd != IntPtr.Zero)
+                {
+                    editHwnd = FindWindowEx(editHwnd, IntPtr.Zero, "Edit", null);
+                }
+            }
+            if (editHwnd == IntPtr.Zero)
+            {
+                // Fallback to searching direct child Edit controls
+                editHwnd = FindWindowEx(hwnd, IntPtr.Zero, "Edit", null);
+            }
+
+            if (editHwnd != IntPtr.Zero)
+            {
+                // Navigate by setting path and pressing Enter
+                SendMessage(editHwnd, WM_SETTEXT, IntPtr.Zero, targetFolder);
+                PostMessage(editHwnd, WM_KEYDOWN, (IntPtr)VK_RETURN, IntPtr.Zero);
+                return true;
+            }
+
+            return false;
         }
     }
 }

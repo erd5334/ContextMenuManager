@@ -621,7 +621,8 @@
                     <StackPanel>
                         <TextBlock Text="Sistem Ayarları" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource PrimaryTextBrush}" Margin="0,0,0,12"/>
                         <CheckBox x:Name="ClassicMenuChk" Content="Windows 11 Klasik Sağ Tık Menüsünü Etkinleştir (Explorer yeniden başlatılır)" Margin="0,0,0,12" Click="ClassicMenuChk_Click"/>
-                        <CheckBox x:Name="PowerShellChk" Content="PowerShell Penceresini Burada Aç seçeneğini sabitle (Shift tuşuna basmak gerekmez)" Click="PowerShellChk_Click"/>
+                        <CheckBox x:Name="PowerShellChk" Content="PowerShell Penceresini Burada Aç seçeneğini sabitle (Shift tuşuna basmak gerekmez)" Margin="0,0,0,12" Click="PowerShellChk_Click"/>
+                        <CheckBox x:Name="CopyAsPathChk" Content="Yol Olarak Kopyala seçeneğini sabitle (Shift tuşuna basmak gerekmez)" Click="CopyAsPathChk_Click"/>
                     </StackPanel>
                 </Border>
                 
