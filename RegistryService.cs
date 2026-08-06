@@ -1440,6 +1440,8 @@ namespace ContextMenuManager
 
         private const uint WM_SETTEXT = 0x000C;
         private const uint WM_KEYDOWN = 0x0100;
+        private const uint WM_KEYUP = 0x0101;
+        private const uint WM_COMMAND = 0x0111;
         private const int VK_RETURN = 0x0D;
 
         public static bool NavigateActiveDialog(string targetFolder)
@@ -1474,9 +1476,16 @@ namespace ContextMenuManager
 
             if (editHwnd != IntPtr.Zero)
             {
-                // Navigate by setting path and pressing Enter
+                // Navigate by setting path
                 SendMessage(editHwnd, WM_SETTEXT, IntPtr.Zero, targetFolder);
-                PostMessage(editHwnd, WM_KEYDOWN, (IntPtr)VK_RETURN, IntPtr.Zero);
+                System.Threading.Thread.Sleep(50); // Wait for text update to register
+
+                // Send Enter key to the parent dialog
+                PostMessage(hwnd, WM_KEYDOWN, (IntPtr)VK_RETURN, IntPtr.Zero);
+                PostMessage(hwnd, WM_KEYUP, (IntPtr)VK_RETURN, IntPtr.Zero);
+
+                // Send default button action to dialog (IDOK = 1)
+                PostMessage(hwnd, WM_COMMAND, (IntPtr)1, IntPtr.Zero);
                 return true;
             }
 
