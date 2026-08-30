@@ -258,7 +258,18 @@ namespace ContextMenuManager
             {
                 if (targetType == "Background")
                 {
-                    cmdVal = isFolder ? $@"explorer.exe ""{absolutePath}""" : $@"""{absolutePath}""";
+                    if (isFolder)
+                    {
+                        string escapedPath = absolutePath.Replace("{", "{{}").Replace("}", "{}}").Replace("~", "{~}").Replace("+", "{+}").Replace("^", "{^}").Replace("%", "{%}").Replace("(", "{(}").Replace(")", "{)}").Replace("[", "{[}").Replace("]", "{]}");
+                        string safePath = absolutePath.Replace("'", "''");
+                        string safeEscapedPath = escapedPath.Replace("'", "''");
+
+                        cmdVal = $@"powershell.exe -WindowStyle Hidden -Command ""Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public class W {{ [DllImport(\""user32.dll\"")] public static extern IntPtr GetForegroundWindow(); [DllImport(\""user32.dll\"")] public static extern int GetClassName(IntPtr h, System.Text.StringBuilder c, int m); }}'; $h=[W]::GetForegroundWindow(); $c=New-Object System.Text.StringBuilder(256); [W]::GetClassName($h,$c,256)|Out-Null; if($c.ToString() -in 'Progman','WorkerW'){{ explorer '{safePath}' }}else{{ $w=New-Object -ComObject WScript.Shell; Start-Sleep -m 150; $w.SendKeys('%d'); Start-Sleep -m 50; $w.SendKeys('{safeEscapedPath}~') }}""";
+                    }
+                    else
+                    {
+                        cmdVal = $@"""{absolutePath}""";
+                    }
                 }
                 else // Directory or AllFiles
                 {
