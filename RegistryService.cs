@@ -1478,14 +1478,14 @@ namespace ContextMenuManager
             {
                 // Navigate by setting path
                 SendMessage(editHwnd, WM_SETTEXT, IntPtr.Zero, targetFolder);
-                System.Threading.Thread.Sleep(50); // Wait for text update to register
+                System.Threading.Thread.Sleep(100); // Wait for text update to register
 
-                // Send Enter key to the parent dialog
+                // Send Enter key to BOTH the Edit control and parent dialog to trigger navigation
+                PostMessage(editHwnd, WM_KEYDOWN, (IntPtr)VK_RETURN, IntPtr.Zero);
+                PostMessage(editHwnd, WM_KEYUP, (IntPtr)VK_RETURN, IntPtr.Zero);
+
                 PostMessage(hwnd, WM_KEYDOWN, (IntPtr)VK_RETURN, IntPtr.Zero);
                 PostMessage(hwnd, WM_KEYUP, (IntPtr)VK_RETURN, IntPtr.Zero);
-
-                // Send default button action to dialog (IDOK = 1)
-                PostMessage(hwnd, WM_COMMAND, (IntPtr)1, IntPtr.Zero);
                 return true;
             }
 
@@ -1494,9 +1494,14 @@ namespace ContextMenuManager
 
         private static IntPtr FindEditControl(IntPtr parent)
         {
-            // 1. Try GetDlgItem with standard filename Edit control ID (1152 / 0x480)
+            // 1. Try GetDlgItem with standard filename ComboBox/Edit control ID (1152 / 0x480)
             IntPtr ctrl = GetDlgItem(parent, 1152);
-            if (ctrl != IntPtr.Zero) return ctrl;
+            if (ctrl != IntPtr.Zero)
+            {
+                IntPtr childEdit = FindWindowEx(ctrl, IntPtr.Zero, "Edit", null);
+                if (childEdit != IntPtr.Zero) return childEdit;
+                return ctrl;
+            }
 
             // 2. Try GetDlgItem with alternate combobox/edit ID (1001)
             ctrl = GetDlgItem(parent, 1001);
@@ -1533,6 +1538,46 @@ namespace ContextMenuManager
                 if (recurse != IntPtr.Zero) return recurse;
             }
             return IntPtr.Zero;
+        }
+
+        public static void MigrateOldFolderShortcuts()
+        {
+            try
+            {
+                var shortcuts = LoadShortcuts();
+                string exePath = Environment.ProcessPath ?? "Sağ Tık Yöneticisi.exe";
+
+                foreach (var item in shortcuts)
+                {
+                    if (item.IsFolder)
+                    {
+                        var index = item.Id.IndexOf('|');
+                        if (index == -1) continue;
+
+                        string targetType = item.Id.Substring(0, index);
+                        string keyId = item.Id.Substring(index + 1);
+                        string rootPath = GetRegistryPath(targetType);
+                        string commandPath = $@"{rootPath}\{keyId}\command";
+
+                        using (var key = Registry.CurrentUser.OpenSubKey(commandPath, true))
+                        {
+                            if (key != null)
+                            {
+                                var currentCmd = key.GetValue("")?.ToString() ?? string.Empty;
+                                if (currentCmd.Contains("explorer.exe") || currentCmd.Contains("powershell.exe") || !currentCmd.Contains("--navigate-dialog"))
+                                {
+                                    string newCmd = $@"""{exePath}"" --navigate-dialog ""{item.Path}""";
+                                    key.SetValue("", newCmd);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Kısayol göç işlemi sırasında hata: {ex.Message}");
+            }
         }
     }
 }

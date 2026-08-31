@@ -78,6 +78,7 @@ namespace ContextMenuManager
             // Normal Startup: Check and lock all groups (self-healing)
             RegistryService.CheckAndLockAllGroups();
             ToggleTheme(RegistryService.LoadThemeSetting());
+            RegistryService.MigrateOldFolderShortcuts();
             RefreshAll();
         }
 
